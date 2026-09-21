@@ -1,0 +1,60 @@
+# SoulCore .NET gate — build + test on every PR touching Host/House/.NET paths.
+# Exists so false "Pass" reports cannot land without a green CI check.
+name: Dotnet CI
+
+on:
+  pull_request:
+    paths:
+      - "SoulCore/**"
+      - "House/**"
+      - ".github/workflows/dotnet-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "SoulCore/**"
+      - "House/**"
+      - ".github/workflows/dotnet-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: dotnet-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: build + test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore SoulCore/SoulCore.sln
+
+      - name: Build
+        run: dotnet build SoulCore/SoulCore.sln -c Release --no-restore --nologo
+
+      - name: Test
+        run: >
+          dotnet test SoulCore/SoulCore.sln
+          -c Release
+          --no-build
+          --nologo
+          --logger "trx;LogFileName=dotnet-ci.trx"
+          --results-directory "${{ runner.temp }}/test-results"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-ci-trx
+          path: ${{ runner.temp }}/test-results
+          if-no-files-found: ignore
