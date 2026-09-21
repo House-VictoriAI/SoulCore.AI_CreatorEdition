@@ -1,5 +1,19 @@
 # AGENTS.md
 
+## Naming (zero exceptions)
+
+The human’s name is **never** written as Kurt / kurt / kurtw — anywhere (code, UI,
+docs, PRs, logs, comments, fixtures, paths).
+
+| Context | Use |
+| --- | --- |
+| Notes, PRs, docs, runbooks, agent reports, UI labels for the human | **LinearThrone** |
+| Copy Victoria reads or says about the human (system prompts, tool guidance, SMS preamble, confirmation asks) | **Kayleigh** |
+| Unreal player pawn / MetaHuman asset named Kayleigh | keep as the **avatar** name (same person in-world) |
+
+If you find a forbidden name, scrub it before merge. No aliases, no “historical”
+exceptions in active product trees.
+
 ## Cursor Cloud specific instructions
 
 SoulCore.AI ("House Victoria") is a single .NET 8 product: a persistent AI-companion
@@ -14,7 +28,7 @@ Notes below are the non-obvious cloud/Linux caveats.
 
 ### My Machines (home PC; tablet scripts only)
 
-Managed cloud VMs cannot touch operator’s LAN. For Host restarts, ChatDesktop WS,
+Managed cloud VMs cannot touch LinearThrone’s LAN. For Host restarts, ChatDesktop WS,
 and local probes, use **Cursor My Machines** on the **home PC**:
 
 - Runbook: `docs/runbooks/cursor-my-machines.md`
