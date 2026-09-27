@@ -1,12 +1,12 @@
-using SoulCore.Inference.Tools.Desktop;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace SoulCore.Host.Companion;
 
 /// <summary>
 /// PROP-1.4: strip EXIF/metadata from outbound MMS JPEGs before carrier send.
-/// Re-encodes via <see cref="ToolImagePayload.TryCompressForVision"/>, which
-/// clears the EXIF/IPTC/XMP profiles explicitly — ImageSharp otherwise carries
-/// them through a save.
+/// Re-encode via ImageSharp with profiles cleared (SaveAsJpeg alone may keep EXIF).
 /// </summary>
 public static class SmsMmsImageSanitizer
 {
@@ -23,12 +23,23 @@ public static class SmsMmsImageSanitizer
         if (!IsJpegContentType(ct) && !LooksLikeJpeg(imageBytes))
             return (imageBytes, ct);
 
-        // High edge cap — MMS carrier limits apply downstream; goal here is metadata removal.
-        var stripped = ToolImagePayload.TryCompressForVision(imageBytes, maxEdgePx: 4096, jpegQuality: 88);
-        if (stripped is { Length: > 0 })
-            return (stripped, "image/jpeg");
-
-        return (imageBytes, ct);
+        try
+        {
+            using var image = Image.Load<Rgba32>(imageBytes);
+            // ImageSharp can retain Exif/Iptc/Xmp on SaveAsJpeg unless cleared.
+            image.Metadata.ExifProfile = null;
+            image.Metadata.IptcProfile = null;
+            image.Metadata.XmpProfile = null;
+            using var ms = new MemoryStream();
+            image.SaveAsJpeg(ms, new JpegEncoder { Quality = 88 });
+            return (ms.ToArray(), "image/jpeg");
+        }
+        catch
+        {
+            // Undecodable buffer that only looked like JPEG — pass through (best-effort).
+            // Real EXIF JPEGs decode above and have profiles cleared before save.
+            return (imageBytes, ct);
+        }
     }
 
     internal static bool IsJpegContentType(string contentType) =>

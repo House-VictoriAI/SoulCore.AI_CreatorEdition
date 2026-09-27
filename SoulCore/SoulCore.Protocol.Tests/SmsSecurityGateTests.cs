@@ -77,10 +77,8 @@ public class SmsSecurityGateTests
 
         Assert.Equal(0, inference.ToolLoopCalls);
         Assert.Equal(1, inference.CompleteCalls);
-        // Wording per BuildSmsPreamble: "Do not call tools, open apps, or invent
-        // function calls." The behavioural gate is ToolLoopCalls == 0 above; this
-        // asserts the preamble also tells the model not to reach for tools.
-        Assert.Contains("do not call tools", inference.LastSystemPreamble ?? "", StringComparison.OrdinalIgnoreCase);
+        // No-tools language lives on the user prompt (media note) and preamble.
+        Assert.Contains("do not invent tool calls", inference.LastUserPrompt ?? "", StringComparison.OrdinalIgnoreCase);
         Assert.Contains("invent function calls", inference.LastSystemPreamble ?? "", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -194,6 +192,7 @@ public class SmsSecurityGateTests
         public int CompleteCalls { get; private set; }
         public int ToolLoopCalls { get; private set; }
         public string? LastSystemPreamble { get; private set; }
+        public string? LastUserPrompt { get; private set; }
 
         public Task<string> CompleteAsync(
             string prompt,
@@ -202,6 +201,7 @@ public class SmsSecurityGateTests
             int? maxTokens = null)
         {
             CompleteCalls++;
+            LastUserPrompt = prompt;
             LastSystemPreamble = systemPreamble;
             return Task.FromResult(Reply);
         }

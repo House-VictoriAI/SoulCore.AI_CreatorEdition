@@ -9,7 +9,7 @@ status: decided-and-shipping
 
 # PROP-12 — Computer use / Playwright resolution
 
-Kurt asked PM-01 (TINA device-side) to talk to Victoria and end months of thrashing on
+LinearThrone asked PM-01 (TINA device-side) to talk to Victoria and end months of thrashing on
 computer-use + Playwright. Live evidence 2026-09-16:
 
 ## What was actually broken

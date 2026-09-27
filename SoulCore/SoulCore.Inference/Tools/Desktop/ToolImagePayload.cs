@@ -82,8 +82,6 @@ public static class ToolImagePayload
 
     /// <summary>
     /// Downscale so max(width,height) ≤ <paramref name="maxEdgePx"/> and encode JPEG.
-    /// Metadata (EXIF/IPTC/XMP) is dropped: these payloads leave the machine, to
-    /// a cloud model or over MMS, and must not carry GPS or device details.
     /// Returns null if the buffer is not a decodable image.
     /// </summary>
     public static byte[]? TryCompressForVision(
@@ -114,8 +112,9 @@ public static class ToolImagePayload
                 image.Mutate(x => x.Resize(nw, nh));
             }
 
-            // ImageSharp round-trips these profiles through SaveAsJpeg, so a
-            // re-encode alone does not strip them.
+            // ImageSharp round-trips these profiles through SaveAsJpeg, so the re-encode
+            // above does not drop them. Screenshots and photos reach a possibly-remote
+            // model from here, and EXIF carries GPS.
             image.Metadata.ExifProfile = null;
             image.Metadata.IptcProfile = null;
             image.Metadata.XmpProfile = null;

@@ -22,6 +22,8 @@
     <EmbeddedResource Include="Migrations\005_episodic_source_model.sql" LogicalName="SoulCore.Memory.Migrations.005_episodic_source_model.sql" />
     <EmbeddedResource Include="Migrations\006_victoria_journals.sql" LogicalName="SoulCore.Memory.Migrations.006_victoria_journals.sql" />
     <EmbeddedResource Include="Schema\006_victoria_journals.sql" LogicalName="SoulCore.Memory.Schema.006_victoria_journals.sql" />
+    <EmbeddedResource Include="Migrations\007_chat_transcript.sql" LogicalName="SoulCore.Memory.Migrations.007_chat_transcript.sql" />
+    <EmbeddedResource Include="Schema\007_chat_transcript.sql" LogicalName="SoulCore.Memory.Schema.007_chat_transcript.sql" />
   </ItemGroup>
 
   <PropertyGroup>

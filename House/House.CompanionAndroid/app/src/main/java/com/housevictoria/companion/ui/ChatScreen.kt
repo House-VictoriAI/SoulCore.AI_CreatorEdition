@@ -4,8 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -44,7 +42,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,29 +53,26 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.housevictoria.companion.data.ChatMessage
+import com.housevictoria.companion.data.ChatStore
 import com.housevictoria.companion.data.CompanionPrefs
-import com.housevictoria.companion.data.GalleryStore
 import com.housevictoria.companion.data.MessageRole
 import com.housevictoria.companion.net.CompanionConnection
-import com.housevictoria.companion.net.CompanionMediaClient
-import com.housevictoria.companion.net.SoulCoreFrame
 import com.housevictoria.companion.net.WsConnectionState
 import kotlinx.coroutines.flow.collectLatest
-import java.util.concurrent.atomic.AtomicReference
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(onOpenSettings: () -> Unit) {
     val context = LocalContext.current
     val config = remember { CompanionPrefs.load(context) }
-    val messages = remember { mutableStateListOf<ChatMessage>() }
-    val streamingAssistantId = remember { AtomicReference<String?>(null) }
+    // Transcript lives in ChatStore (process-scoped + disk-cached) so leaving
+    // this screen no longer wipes the thread. See PROP-3 Wave 1.
+    val messages by ChatStore.messages.collectAsState()
     var draft by remember { mutableStateOf("") }
     var pendingQuote by remember { mutableStateOf<String?>(null) }
     var quoteEditFor by remember { mutableStateOf<ChatMessage?>(null) }
     var quoteEditText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
-    val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     val connPair by CompanionConnection.state.collectAsState()
     val connLabel = when (connPair.first) {
@@ -86,101 +80,6 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
         WsConnectionState.Connecting -> "Connecting…"
         WsConnectionState.Failed -> "Host down"
         WsConnectionState.Disconnected -> "Disconnected"
-    }
-
-    fun onMain(block: () -> Unit) {
-        if (Looper.myLooper() == Looper.getMainLooper()) block()
-        else mainHandler.post(block)
-    }
-
-    fun appendSystem(text: String) {
-        messages.add(ChatMessage(role = MessageRole.SYSTEM, content = text))
-    }
-
-    fun fetchMediaIntoMessage(messageId: String, mediaId: String) {
-        Thread {
-            val cfg = CompanionPrefs.load(context)
-            val bytes = CompanionMediaClient.downloadMedia(cfg.resolvedHttpBase(), cfg.token, mediaId)
-            bytes.onSuccess { png ->
-                val item = GalleryStore.saveBytes(context, png, mediaId = mediaId)
-                onMain {
-                    val idx = messages.indexOfFirst { it.id == messageId }
-                    if (idx >= 0) {
-                        messages[idx] = messages[idx].copy(localImagePath = item.localPath)
-                    }
-                }
-            }
-        }.start()
-    }
-
-    fun appendOrUpdateAssistant(frame: SoulCoreFrame, finalize: Boolean) {
-        val text = frame.payloadText()
-        val mediaId = frame.payloadString("mediaId")
-        val hasMedia = frame.payload?.optBoolean("hasMedia", false) == true || !mediaId.isNullOrBlank()
-        val proactive = frame.payload?.optBoolean("proactive", false) == true
-        if (text.isNullOrEmpty() && finalize && !hasMedia) {
-            streamingAssistantId.set(null)
-            return
-        }
-        val content = text.orEmpty()
-        val streamId = streamingAssistantId.get()
-        if (streamId != null) {
-            val idx = messages.indexOfFirst { it.id == streamId }
-            if (idx >= 0) {
-                val existing = messages[idx]
-                if (frame.id.isBlank() || existing.frameId == frame.id || existing.frameId.isNullOrBlank()) {
-                    messages[idx] = existing.copy(
-                        content = content.ifEmpty { existing.content },
-                        frameId = frame.id.ifBlank { existing.frameId },
-                        mediaId = mediaId ?: existing.mediaId,
-                        proactive = proactive || existing.proactive
-                    )
-                    if (finalize) {
-                        streamingAssistantId.set(null)
-                        if (hasMedia && !mediaId.isNullOrBlank()) {
-                            fetchMediaIntoMessage(messages[idx].id, mediaId)
-                        }
-                    }
-                    return
-                }
-            }
-        }
-        val bubble = ChatMessage(
-            role = MessageRole.ASSISTANT,
-            content = content.ifEmpty { if (hasMedia) "(image)" else "" },
-            frameId = frame.id.ifBlank { null },
-            mediaId = mediaId,
-            proactive = proactive
-        )
-        messages.add(bubble)
-        streamingAssistantId.set(if (finalize) null else bubble.id)
-        if (finalize && hasMedia && !mediaId.isNullOrBlank()) {
-            fetchMediaIntoMessage(bubble.id, mediaId)
-        }
-    }
-
-    fun applyFrame(frame: SoulCoreFrame) {
-        when (frame.type) {
-            SoulCoreFrame.CHAT_DELTA -> appendOrUpdateAssistant(frame, finalize = false)
-            SoulCoreFrame.CHAT_DONE -> appendOrUpdateAssistant(frame, finalize = true)
-            SoulCoreFrame.ERROR -> {
-                streamingAssistantId.set(null)
-                val code = frame.payloadString("code")
-                val msg = frame.payloadString("message") ?: frame.payload?.toString().orEmpty()
-                messages.add(
-                    ChatMessage(
-                        role = MessageRole.ERROR,
-                        content = "error${code?.let { " [$it]" } ?: ""}: $msg"
-                    )
-                )
-            }
-            SoulCoreFrame.PRESENCE_STATUS,
-            SoulCoreFrame.EMOTION_SNAPSHOT,
-            SoulCoreFrame.PONG,
-            "loop.want",
-            "loop.tick.ok" -> Unit
-            else -> appendSystem("frame ${frame.type} id=${frame.id}")
-        }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -210,16 +109,13 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                 (state == WsConnectionState.Connected || state == WsConnectionState.Failed)
             ) {
                 lastDetail = detail
-                onMain { appendSystem(detail) }
+                ChatStore.addSystem(detail)
             }
         }
     }
 
-    LaunchedEffect(Unit) {
-        CompanionConnection.frames.collectLatest { frame ->
-            onMain { applyFrame(frame) }
-        }
-    }
+    // Frames are folded into ChatStore process-wide (see CompanionApp), so this
+    // screen deliberately does not collect them.
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -322,18 +218,17 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         val text = draft.trim()
                         if (text.isEmpty()) return@IconButton
                         val quoted = pendingQuote
-                        streamingAssistantId.set(null)
                         val display = if (quoted.isNullOrBlank()) {
                             text
                         } else {
                             "↪ ${quoted.replace('\n', ' ').take(120)}\n$text"
                         }
-                        messages.add(ChatMessage(role = MessageRole.USER, content = display))
+                        ChatStore.addUser(display)
                         draft = ""
                         pendingQuote = null
                         val result = CompanionConnection.client.sendChat(text, quotedText = quoted)
                         result.exceptionOrNull()?.message?.let { err ->
-                            messages.add(ChatMessage(role = MessageRole.SYSTEM, content = err))
+                            ChatStore.addSystem(err)
                         }
                     }
                 ) {
