@@ -112,6 +112,13 @@ public static class ToolImagePayload
                 image.Mutate(x => x.Resize(nw, nh));
             }
 
+            // ImageSharp round-trips these profiles through SaveAsJpeg, so the re-encode
+            // above does not drop them. Screenshots and photos reach a possibly-remote
+            // model from here, and EXIF carries GPS.
+            image.Metadata.ExifProfile = null;
+            image.Metadata.IptcProfile = null;
+            image.Metadata.XmpProfile = null;
+
             using var ms = new MemoryStream();
             image.SaveAsJpeg(ms, new JpegEncoder { Quality = jpegQuality });
             return ms.ToArray();
