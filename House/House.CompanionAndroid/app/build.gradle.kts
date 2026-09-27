@@ -68,4 +68,9 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    testImplementation("junit:junit:4.13.2")
+    // android.jar ships org.json as throwing stubs, so JVM unit tests that parse Host
+    // responses need a real implementation on the test classpath.
+    testImplementation("org.json:json:20240303")
 }

@@ -118,11 +118,19 @@ class SoulCoreWsClient(
         }
     }
 
+    /**
+     * Send a `chat.send` frame.
+     *
+     * @return the frame id on success. The Host stores the durable transcript rows for
+     *   this turn under that id (`<id>` for its reply, `<id>:user` for the operator's
+     *   line), so the caller can recognise its own turn when hydrating and avoid
+     *   rendering it twice.
+     */
     fun sendChat(
         text: String,
         sessionId: String? = this.sessionId,
         quotedText: String? = null
-    ): Result<Unit> {
+    ): Result<String> {
         val socket = socketRef.get()
         if (socket == null || state != WsConnectionState.Connected) {
             val msg = "WS unavailable — chat.send not sent. Host must be up on loopback /ws. " +
@@ -133,7 +141,7 @@ class SoulCoreWsClient(
         val frame = SoulCoreFrame.chatSend(text, sessionId, quotedText)
         val ok = socket.send(frame.toJson())
         return if (ok) {
-            Result.success(Unit)
+            Result.success(frame.id)
         } else {
             Result.failure(IllegalStateException("chat.send enqueue failed (socket closing?)"))
         }

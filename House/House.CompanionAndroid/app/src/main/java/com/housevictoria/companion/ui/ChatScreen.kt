@@ -223,10 +223,13 @@ fun ChatScreen(onOpenSettings: () -> Unit) {
                         } else {
                             "↪ ${quoted.replace('\n', ' ').take(120)}\n$text"
                         }
-                        ChatStore.addUser(display)
+                        // Send first so the turn can carry the frame id the Host will file
+                        // it under; the bubble is still added either way, so a failed send
+                        // does not silently swallow what the operator typed.
+                        val result = CompanionConnection.client.sendChat(text, quotedText = quoted)
+                        ChatStore.addUser(display, result.getOrNull())
                         draft = ""
                         pendingQuote = null
-                        val result = CompanionConnection.client.sendChat(text, quotedText = quoted)
                         result.exceptionOrNull()?.message?.let { err ->
                             ChatStore.addSystem(err)
                         }
