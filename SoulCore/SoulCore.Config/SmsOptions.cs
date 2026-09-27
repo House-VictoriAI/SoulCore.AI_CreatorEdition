@@ -14,7 +14,7 @@ public sealed class SmsOptions
     public string ConversationSessionId { get; set; } = "presence-local";
 
     /// <summary>
-    /// Comma/semicolon/whitespace-separated operator E.164 allowlist
+    /// Comma/semicolon/whitespace-separated Kayleigh E.164 allowlist
     /// (e.g. <c>+15551234567</c>). Unknown senders are silently dropped.
     /// Empty allowlist = deny all (fail closed).
     /// </summary>

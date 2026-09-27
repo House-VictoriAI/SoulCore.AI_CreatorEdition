@@ -22,7 +22,7 @@ public sealed class BrowserNavigateTool : ITool
         Name: "browser_navigate",
         Description:
             "Open a URL in Victoria's Playwright Chromium (primary web browser — not VirtualBox Firefox, " +
-            "not the operator's Chrome). Success means load attempted — goal_complete stays false until " +
+            "not Kayleigh's Chrome). Success means load attempted — goal_complete stays false until " +
             "login/forms are done. Prefer browser_snapshot / browser_click_text next.",
         Parameters: Parameters);
 
@@ -132,7 +132,7 @@ public sealed class BrowserClickTextTool : ITool
 public sealed class BrowserFillTool : ITool
 {
     private static readonly JsonElement Parameters = JsonDocument.Parse(
-        """{"type":"object","properties":{"field":{"type":"string","description":"Field label or placeholder (Email, Username, Search)."},"value":{"type":"string","description":"Text to type. Do not type secrets unless the operator asked."}},"required":["field","value"]}""")
+        """{"type":"object","properties":{"field":{"type":"string","description":"Field label or placeholder (Email, Username, Search)."},"value":{"type":"string","description":"Text to type. Do not type secrets unless Kayleigh asked."}},"required":["field","value"]}""")
         .RootElement.Clone();
 
     private readonly IBrowserBridge _bridge;
@@ -148,7 +148,7 @@ public sealed class BrowserFillTool : ITool
         Name: "browser_fill",
         Description:
             "Fill a named input in Victoria's Playwright Chromium (Email, Username, Search). " +
-            "Do not type passwords or secrets unless the operator explicitly asked.",
+            "Do not type passwords or secrets unless Kayleigh explicitly asked.",
         Parameters: Parameters);
 
     public async Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken ct = default)

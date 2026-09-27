@@ -301,80 +301,62 @@ internal static class FilesystemGuard
             }
             catch (Exception)
             {
-                // fall through to the component walk
+                // fall through to POSIX walk / GetFullPath
             }
         }
 
-        return ResolvePosixFinalPath(path);
-    }
-
-    /// <summary>
-    /// Follow POSIX symlinks one path component at a time.
-    /// <see cref="Path.GetFullPath"/> only normalizes lexically — it does not
-    /// read the filesystem — so a symlink sitting inside a whitelisted root can
-    /// point outside it and still satisfy the prefix check. Every ancestor is
-    /// resolved because the link may be any component, not just the leaf.
-    /// </summary>
-    private static string ResolvePosixFinalPath(string path)
-    {
-        // Guards against symlink cycles; POSIX SYMLOOP_MAX is typically 40.
-        const int maxHops = 40;
-
-        string full;
+        // Path.GetFullPath does NOT resolve symlink targets on Linux/macOS, and
+        // FileInfo.ResolveLinkTarget is null for paths that merely *traverse*
+        // a directory symlink (BED-133 escape). Walk each segment and resolve
+        // directory/file links to the final target.
         try
         {
-            full = Path.GetFullPath(path);
+            return ResolvePosixSymlinkPath(path);
         }
         catch (Exception)
         {
-            return path;
+            // fall through
         }
 
-        var root = Path.GetPathRoot(full);
-        if (string.IsNullOrEmpty(root))
-            return full;
+        return Path.GetFullPath(path);
+    }
 
-        var segments = full[root.Length..]
-            .Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
-                StringSplitOptions.RemoveEmptyEntries);
+    /// <summary>
+    /// Walk path segments, resolving any directory/file symlink to its final target.
+    /// </summary>
+    private static string ResolvePosixSymlinkPath(string path)
+    {
+        var full = Path.GetFullPath(path);
+        var root = Path.GetPathRoot(full) ?? Path.DirectorySeparatorChar.ToString();
+        var relative = full;
+        if (!string.IsNullOrEmpty(root) && full.StartsWith(root, StringComparison.Ordinal))
+            relative = full[root.Length..];
+
+        var parts = relative.Split(
+            new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+            StringSplitOptions.RemoveEmptyEntries);
 
         var current = root;
-        var hops = 0;
-
-        foreach (var segment in segments)
+        foreach (var part in parts)
         {
-            current = Path.Combine(current, segment);
-
-            while (hops++ < maxHops)
+            current = Path.Combine(current, part);
+            if (Directory.Exists(current))
             {
-                string? resolved;
-                try
-                {
-                    FileSystemInfo info = Directory.Exists(current)
-                        ? new DirectoryInfo(current)
-                        : new FileInfo(current);
-
-                    // LinkTarget is null for ordinary files and for paths that
-                    // do not exist yet (write targets) — nothing to follow.
-                    resolved = info.LinkTarget is null
-                        ? null
-                        : info.ResolveLinkTarget(returnFinalTarget: true)?.FullName;
-                }
-                catch (Exception)
-                {
-                    // Broken or unreadable link: keep the lexical form. The
-                    // caller's prefix check still applies.
-                    break;
-                }
-
-                if (string.IsNullOrEmpty(resolved))
-                    break;
-
-                current = Path.GetFullPath(resolved);
+                var dir = new DirectoryInfo(current);
+                var target = dir.ResolveLinkTarget(returnFinalTarget: true);
+                if (target is not null)
+                    current = target.FullName;
+            }
+            else if (File.Exists(current))
+            {
+                var file = new FileInfo(current);
+                var target = file.ResolveLinkTarget(returnFinalTarget: true);
+                if (target is not null)
+                    current = target.FullName;
             }
         }
 
-        return current;
+        return Path.GetFullPath(current);
     }
 
     private static bool IsInside(string candidate, string rootWithTrailingSep)

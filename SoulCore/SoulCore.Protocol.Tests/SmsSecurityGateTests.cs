@@ -194,6 +194,7 @@ public class SmsSecurityGateTests
         public int CompleteCalls { get; private set; }
         public int ToolLoopCalls { get; private set; }
         public string? LastSystemPreamble { get; private set; }
+        public string? LastUserPrompt { get; private set; }
 
         public Task<string> CompleteAsync(
             string prompt,
@@ -202,6 +203,7 @@ public class SmsSecurityGateTests
             int? maxTokens = null)
         {
             CompleteCalls++;
+            LastUserPrompt = prompt;
             LastSystemPreamble = systemPreamble;
             return Task.FromResult(Reply);
         }
