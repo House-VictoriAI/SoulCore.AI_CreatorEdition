@@ -5,7 +5,7 @@ using SixLabors.ImageSharp.PixelFormats;
 namespace SoulCore.Inference.Tools.Browser;
 
 /// <summary>
-/// Visible click cursor for Kurt: on-page overlay (headed Chromium) + burn-in on Presence JPEGs.
+/// Visible click cursor for Kayleigh: on-page overlay (headed Chromium) + burn-in on Presence JPEGs.
 /// </summary>
 public static class PlaywrightClickCursor
 {

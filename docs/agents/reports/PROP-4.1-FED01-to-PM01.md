@@ -14,7 +14,7 @@ mockup: docs/agents/unexecuted_proposals/assets/presence-lamp-drawer-closed-open
 
 # PROP-4.1 — House drawer + honest HUD (FED-01 → PM-01)
 
-**Verdict: Partial** — cloud-feasible slice complete (structure, honesty contracts, build, unit tests). Full visual parity with mockup and live Host wiring require Kurt's Windows Presence box.
+**Verdict: Partial** — cloud-feasible slice complete (structure, honesty contracts, build, unit tests). Full visual parity with mockup and live Host wiring require LinearThrone's Windows Presence box.
 
 ## What shipped (already on main, verified this branch)
 

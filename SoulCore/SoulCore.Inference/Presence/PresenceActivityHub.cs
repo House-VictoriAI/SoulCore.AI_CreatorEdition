@@ -19,7 +19,7 @@ public sealed record PresenceActivitySnapshot(
 
 /// <summary>
 /// Prefers recent chat, then recent desktop/tool act from <see cref="Tools.Desktop.IDesktopViewHub"/>,
-/// then a short life line when the operator is silent.
+/// then a short life line when Kayleigh is silent.
 /// </summary>
 public sealed class PresenceActivityHub : IPresenceActivityHub
 {

@@ -55,7 +55,7 @@ public class PlaywrightBrowserBridgeTests
     public void FormatPlaywrightError_MissingBrowser_IncludesInstallRecipe()
     {
         var ex = new InvalidOperationException(
-            "Executable doesn't exist at C:\\Users\\kurt\\.cache\\ms-playwright\\chromium-1148\\chrome-win\\chrome.exe");
+            "Executable doesn't exist at %USERPROFILE%\\.cache\\ms-playwright\\chromium-1148\\chrome-win\\chrome.exe");
         var msg = PlaywrightBrowserBridge.FormatPlaywrightError("navigate", ex);
         Assert.Contains("not set up yet", msg, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("install-playwright.ps1", msg, StringComparison.OrdinalIgnoreCase);
@@ -70,7 +70,7 @@ public class PlaywrightBrowserBridgeTests
     public void FormatPlaywrightError_MissingHeadlessShell_IncludesInstallRecipe()
     {
         var ex = new InvalidOperationException(
-            "Executable doesn't exist at C:\\Users\\kurtw\\AppData\\Local\\ms-playwright\\chromium_headless_shell-1148\\chrome-win\\headless_shell.exe");
+            "Executable doesn't exist at %USERPROFILE%\\AppData\\Local\\ms-playwright\\chromium_headless_shell-1148\\chrome-win\\headless_shell.exe");
         var msg = PlaywrightBrowserBridge.FormatPlaywrightError("health", ex);
         Assert.Contains("not set up yet", msg, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("install-playwright.ps1", msg, StringComparison.OrdinalIgnoreCase);
@@ -109,7 +109,7 @@ public class PlaywrightBrowserBridgeTests
             pageChanged: true);
         Assert.Contains("page changed", msg, StringComparison.Ordinal);
         Assert.Contains("browser_snapshot", msg, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("before telling Kurt you are waiting", msg, StringComparison.Ordinal);
+        Assert.Contains("before telling Kayleigh you are waiting", msg, StringComparison.Ordinal);
     }
 
     [Fact]

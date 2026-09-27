@@ -469,8 +469,8 @@ private fun EmailAccountsSection(
 
     fun mailboxTitle(id: String): String = when (id.lowercase()) {
         "victoria" -> "Victoria's mailbox"
-        "personal" -> "Kurt's personal mail"
-        "business" -> "Kurt's business mail"
+        "personal" -> "LinearThrone's personal mail"
+        "business" -> "LinearThrone's business mail"
         else -> id
     }
 
@@ -483,7 +483,7 @@ private fun EmailAccountsSection(
 
     fun defaultDisplayName(id: String): String = when (id.lowercase()) {
         "victoria" -> "Victoria"
-        "personal", "business" -> "Kurt"
+        "personal", "business" -> "LinearThrone"
         else -> ""
     }
 
@@ -641,7 +641,7 @@ private fun EmailAccountsSection(
         onValueChange = { displayName = it },
         modifier = Modifier.fillMaxWidth(),
         label = { Text("Name on outgoing mail") },
-        placeholder = { Text("e.g. Victoria or Kurt") },
+        placeholder = { Text("e.g. Victoria or LinearThrone") },
         singleLine = true
     )
     Spacer(Modifier.height(8.dp))

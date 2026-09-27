@@ -37,14 +37,14 @@ public sealed record SmsOutboundEnqueueResult(
 
 public interface ISmsOutboundService
 {
-    /// <summary>Enqueue a short SMS to an allowlisted E.164 (operator).</summary>
+    /// <summary>Enqueue a short SMS to an allowlisted E.164 (Kayleigh).</summary>
     Task<SmsOutboundEnqueueResult> EnqueueSmsAsync(
         string toE164,
         string text,
         string? source = null,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Enqueue an MMS still (image + optional caption) to allowlisted operator.</summary>
+    /// <summary>Enqueue an MMS still (image + optional caption) to allowlisted Kayleigh number.</summary>
     Task<SmsOutboundEnqueueResult> EnqueueMmsAsync(
         string toE164,
         byte[] imageBytes,
@@ -53,7 +53,7 @@ public interface ISmsOutboundService
         string? source = null,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Prefer Victoria browser frame, else Presence desktop hub; MMS to first allowlisted operator.</summary>
+    /// <summary>Prefer Victoria browser frame, else Presence desktop hub; MMS to first allowlisted Kayleigh number.</summary>
     Task<SmsOutboundEnqueueResult> EnqueueScreenshotMmsAsync(
         string? caption = null,
         string? source = null,

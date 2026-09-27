@@ -504,7 +504,7 @@
                 <TextBlock Text="Email" FontWeight="SemiBold" Margin="0,0,0,6"/>
                 <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,6"
                            Text="Quick switches (same controls live on the Email tab with mailbox setup)."/>
-                <CheckBox x:Name="ToolsAllowEmailReadCheck" Content="Allow email read / sort / mark (victoria + Kurt accounts)"
+                <CheckBox x:Name="ToolsAllowEmailReadCheck" Content="Allow email read / sort / mark (victoria + LinearThrone accounts)"
                           Margin="0,0,0,6" Click="ToolsAccessToggle_Click"/>
                 <CheckBox x:Name="ToolsAllowEmailSendCheck" Content="Allow email send / reply (still asks for confirmation)"
                           Margin="0,0,0,6" Click="ToolsAccessToggle_Click"/>
@@ -565,7 +565,7 @@
                 <TextBlock Text="Name on outgoing mail" FontWeight="SemiBold" Margin="0,8,0,0"/>
                 <TextBox x:Name="EmailDisplayNameBox" Classes="input" Height="36" Padding="10,0"
                          VerticalContentAlignment="Center"
-                         Watermark="e.g. Victoria or Kurt"/>
+                         Watermark="e.g. Victoria or LinearThrone"/>
 
                 <!-- Username kept for non-Gmail; auto-filled from address when blank -->
                 <TextBox x:Name="EmailUsernameBox" IsVisible="False"/>
