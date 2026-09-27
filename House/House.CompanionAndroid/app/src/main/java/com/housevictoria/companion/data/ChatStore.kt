@@ -73,8 +73,17 @@ object ChatStore {
     /**
      * Append a diagnostic line. System/error rows are session-only: connection
      * chatter does not belong in the durable thread.
+     *
+     * Repeats are dropped. Every return to Chat re-emits the current connection
+     * detail, which used to be harmless only because leaving the screen threw
+     * the list away; now that the thread survives, it would stack up identical
+     * "WS connected" bubbles.
      */
     fun addSystem(content: String) {
+        synchronized(lock) {
+            val last = _messages.value.lastOrNull { it.role == MessageRole.SYSTEM }
+            if (last?.content == content) return
+        }
         append(ChatMessage(role = MessageRole.SYSTEM, content = content))
     }
 
