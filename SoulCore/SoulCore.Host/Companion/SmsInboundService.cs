@@ -26,6 +26,7 @@ public sealed class SmsInboundService : ISmsInboundService
     private readonly ICompanionMediaService _media;
     private readonly PresenceWsHub _hub;
     private readonly ISmsOutboundService _outbound;
+    private readonly IChatTranscriptStore? _transcript;
     private readonly ILogger<SmsInboundService> _logger;
 
     public SmsInboundService(
@@ -39,7 +40,8 @@ public sealed class SmsInboundService : ISmsInboundService
         ICompanionMediaService media,
         PresenceWsHub hub,
         ISmsOutboundService outbound,
-        ILogger<SmsInboundService> logger)
+        ILogger<SmsInboundService> logger,
+        IChatTranscriptStore? transcript = null)
     {
         _sms = sms?.Value ?? throw new ArgumentNullException(nameof(sms));
         _inference = inference?.Value ?? throw new ArgumentNullException(nameof(inference));
@@ -52,6 +54,7 @@ public sealed class SmsInboundService : ISmsInboundService
         _hub = hub ?? throw new ArgumentNullException(nameof(hub));
         _outbound = outbound ?? throw new ArgumentNullException(nameof(outbound));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _transcript = transcript;
     }
 
     public async Task<SmsInboundResult> HandleAsync(
@@ -102,7 +105,7 @@ public sealed class SmsInboundService : ISmsInboundService
             userVisible = text; // caption kept; mediaId on frame
 
         var sessionId = string.IsNullOrWhiteSpace(_sms.ConversationSessionId)
-            ? "presence-local"
+            ? PresenceConversation.Id
             : _sms.ConversationSessionId.Trim();
 
         var userFrameId = Guid.NewGuid().ToString("N");
@@ -287,6 +290,26 @@ public sealed class SmsInboundService : ISmsInboundService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "SMS history append failed");
+        }
+
+        // PROP-3 Wave 1: the same turn into the durable transcript, so a phone that was not
+        // connected when the text arrived still hydrates it. Frame ids match the broadcast
+        // frames above, letting a client that did see them live skip the duplicate.
+        if (_transcript is not null)
+        {
+            try
+            {
+                await _transcript
+                    .AppendAsync(sessionId, "user", userVisible, Channel, userFrameId, mediaId, cancellationToken)
+                    .ConfigureAwait(false);
+                await _transcript
+                    .AppendAsync(sessionId, "assistant", reply, Channel, replyFrameId, null, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "SMS durable transcript append failed");
+            }
         }
 
         try

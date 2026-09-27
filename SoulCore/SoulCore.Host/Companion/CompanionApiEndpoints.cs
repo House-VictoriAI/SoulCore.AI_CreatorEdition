@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using SoulCore.Adapters.Ws;
 using SoulCore.Config;
 using SoulCore.Host.Ws;
+using SoulCore.Memory;
 
 namespace SoulCore.Host.Companion;
 
@@ -17,6 +18,9 @@ namespace SoulCore.Host.Companion;
 /// </summary>
 public static class CompanionApiEndpoints
 {
+    /// <summary>Hydrate page size when the client does not ask for one.</summary>
+    private const int DefaultHydratePageSize = 100;
+
     public static IEndpointRouteBuilder MapCompanionApi(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/companion/v1")
@@ -38,6 +42,51 @@ public static class CompanionApiEndpoints
                         description = "Victoria (SoulCore). Extra personas reserved for a future external service."
                     }
                 }
+            });
+        });
+
+        // PROP-3 Wave 1: hydrate cursor. A client passes the highest id it already has and gets
+        // everything after it, oldest first, so a fresh install backfills desk and SMS history
+        // instead of starting empty. `after=0` (or omitted with recent=false) means from the top.
+        group.MapGet("/messages", async (
+            IChatTranscriptStore transcript,
+            string? conversationId,
+            long? after,
+            int? limit,
+            bool? recent,
+            CancellationToken ct) =>
+        {
+            var conversation = string.IsNullOrWhiteSpace(conversationId)
+                ? PresenceConversation.Id
+                : conversationId.Trim();
+            var pageSize = limit is > 0 ? limit.Value : DefaultHydratePageSize;
+            var afterId = after is > 0 ? after.Value : 0;
+
+            // A cold client with no cursor usually wants the tail of a long thread, not all of it.
+            var messages = recent == true && afterId == 0
+                ? await transcript.GetRecentAsync(conversation, pageSize, ct).ConfigureAwait(false)
+                : await transcript.GetSinceAsync(conversation, afterId, pageSize, ct).ConfigureAwait(false);
+
+            var latest = await transcript.GetLatestCursorAsync(conversation, ct).ConfigureAwait(false);
+            var cursor = messages.Count > 0 ? messages[^1].Id : afterId;
+
+            return Results.Json(new
+            {
+                conversationId = conversation,
+                messages = messages.Select(m => new
+                {
+                    id = m.Id,
+                    role = m.Role,
+                    content = m.Content,
+                    occurredAt = m.OccurredAt,
+                    channel = m.Channel,
+                    frameId = m.FrameId,
+                    mediaId = m.MediaId
+                }),
+                cursor,
+                latestCursor = latest,
+                // True when more rows remain past this page, so the client keeps paging.
+                hasMore = cursor < latest
             });
         });
 
