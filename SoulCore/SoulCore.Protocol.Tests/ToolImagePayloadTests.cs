@@ -1,4 +1,5 @@
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Metadata.Profiles.Exif;
 using SixLabors.ImageSharp.PixelFormats;
 using SoulCore.Inference.Tools.Desktop;
 
@@ -32,12 +33,55 @@ public class ToolImagePayloadTests
     }
 
     [Fact]
+    public void TryCompressForVision_StripsExifGps()
+    {
+        var withGps = MakeJpegWithExifGps();
+        Assert.True(HasExif(withGps));
+
+        var jpeg = ToolImagePayload.TryCompressForVision(withGps);
+
+        Assert.NotNull(jpeg);
+        Assert.False(HasExif(jpeg!));
+    }
+
+    [Fact]
+    public void TryExtractBase64Images_StripsExifGps()
+    {
+        var withGps = MakeJpegWithExifGps();
+        var images = ToolImagePayload.TryExtractBase64Images(new { bytes = withGps });
+
+        Assert.NotNull(images);
+        Assert.Single(images!);
+        Assert.False(HasExif(Convert.FromBase64String(images![0])));
+    }
+
+    [Fact]
     public void TryExtractBase64Images_OverMaxBytes_ReturnsNull()
     {
         var huge = new byte[4_000_001];
         huge[0] = 0x89;
         var images = ToolImagePayload.TryExtractBase64Images(new { bytes = huge }, maxBytes: 1000);
         Assert.Null(images);
+    }
+
+    private static byte[] MakeJpegWithExifGps()
+    {
+        using var image = new Image<Rgba32>(32, 32);
+        image.Metadata.ExifProfile = new ExifProfile();
+        image.Metadata.ExifProfile.SetValue(
+            ExifTag.GPSLatitude,
+            new[] { new Rational(41), new Rational(52), new Rational(30) });
+
+        using var ms = new MemoryStream();
+        image.SaveAsJpeg(ms);
+        return ms.ToArray();
+    }
+
+    private static bool HasExif(byte[] jpeg)
+    {
+        using var image = Image.Load(jpeg);
+        return image.Metadata.ExifProfile is not null
+               && image.Metadata.ExifProfile.Values.Count > 0;
     }
 
     private static byte[] MakePng(int width, int height)
