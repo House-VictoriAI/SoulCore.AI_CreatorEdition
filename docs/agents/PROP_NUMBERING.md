@@ -49,6 +49,7 @@ Reconciled against `main` on **2026-09-15**. `Pass` = accepted **and** the code 
 | PROP-10-inference-clients-tools-split | Inference Clients vs Tools boundary | **Pass** — 10.1 Accepted 2026-09-05; landed on `main` 2026-09-14 via PR #86 (`cursor/prop10-inference-split-land-9d6e`; supersedes orphan `cursor/prop10-inference-split-8a1f`) | — (report-only) |
 | PROP-11-memory-store-repository-split | Split SqliteMemoryStore into repos (one DB file) | **Pass** — 11.1 Accepted 2026-09-05 (`cursor/prop11-memory-repos-8a1f`); on `main` | — (report-only) |
 | PROP-12-presence-resizable-shell | Presence frameless resize + adjustable chat/browser/sight panes | **Open** — 12.1 FED **Partial** (build+unit tests; Windows visual QA) | 12.1 |
+| PROP-12-cua-playwright-resolution | Lock web=Playwright / desktop=CUA+VM; ForceTool health companion | **Decided 2026-09-16** — emergency ship; see `docs/agents/reports/PROP-12-PM01-cua-playwright-decision.md` | emergency |
 
 **Report-only splits (PROP-7…11).** No `PROP-7.1`…`PROP-11.1` ticket files exist. Each shipped
 straight off its proposal + intake and filed a `PROP-{N}.1-BED01-to-PM01.md` Pass report. Recorded
