@@ -74,32 +74,40 @@ object ChatHydrateClient {
         http.newCall(builder.build()).execute().use { resp ->
             val body = resp.body?.string().orEmpty()
             if (!resp.isSuccessful) error("HTTP ${resp.code}: ${body.take(160)}")
-
-            val root = JSONObject(body)
-            val arr = root.optJSONArray("messages")
-            val messages = buildList {
-                for (i in 0 until (arr?.length() ?: 0)) {
-                    val o = arr!!.optJSONObject(i) ?: continue
-                    add(
-                        HydratedMessage(
-                            id = o.optLong("id"),
-                            role = o.optString("role"),
-                            content = o.optString("content"),
-                            occurredAt = o.optString("occurredAt"),
-                            channel = o.optString("channel").ifBlank { null },
-                            frameId = o.optString("frameId").ifBlank { null },
-                            mediaId = o.optString("mediaId").ifBlank { null }
-                        )
-                    )
-                }
-            }
-            HydratePage(
-                conversationId = root.optString("conversationId"),
-                messages = messages,
-                cursor = root.optLong("cursor"),
-                latestCursor = root.optLong("latestCursor"),
-                hasMore = root.optBoolean("hasMore", false)
-            )
+            parsePage(body)
         }
+    }
+
+    /**
+     * Parse a hydrate response body. Split out from the request so the wire contract with
+     * `CompanionApiEndpoints` can be asserted against a captured Host response without a
+     * live socket — a field rename on either side should fail a test, not a phone.
+     */
+    fun parsePage(body: String): HydratePage {
+        val root = JSONObject(body)
+        val arr = root.optJSONArray("messages")
+        val messages = buildList {
+            for (i in 0 until (arr?.length() ?: 0)) {
+                val o = arr!!.optJSONObject(i) ?: continue
+                add(
+                    HydratedMessage(
+                        id = o.optLong("id"),
+                        role = o.optString("role"),
+                        content = o.optString("content"),
+                        occurredAt = o.optString("occurredAt"),
+                        channel = o.optString("channel").ifBlank { null },
+                        frameId = o.optString("frameId").ifBlank { null },
+                        mediaId = o.optString("mediaId").ifBlank { null }
+                    )
+                )
+            }
+        }
+        return HydratePage(
+            conversationId = root.optString("conversationId"),
+            messages = messages,
+            cursor = root.optLong("cursor"),
+            latestCursor = root.optLong("latestCursor"),
+            hasMore = root.optBoolean("hasMore", false)
+        )
     }
 }

@@ -18,7 +18,6 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -189,59 +188,15 @@ object ChatStore {
         }
     }
 
-    /**
-     * Fold Host rows into the thread, skipping any we already have.
-     *
-     * Dedupe is on `frameId`, which both sides agree on: the Host files a reply under the
-     * `chat.done` frame id and the operator's line under `<id>:user`, and the client
-     * records both. Rows older than everything we hold are prepended as history; newer
-     * rows append. That covers the three real cases — fresh install, a gap while offline,
-     * and backfilling history behind a thread we already partly have.
-     *
-     * @return how many rows were actually added.
-     */
+    /** Apply [ChatThreadMerge] under the lock. Returns how many rows were added. */
     private fun mergeHydrated(incoming: List<HydratedMessage>): Int {
         if (incoming.isEmpty()) return 0
-
         synchronized(lock) {
-            val current = _messages.value
-            val knownFrameIds = current.mapNotNullTo(HashSet()) { it.frameId }
-            val oldestLocal = current
-                .filter { it.role == MessageRole.USER || it.role == MessageRole.ASSISTANT }
-                .minOfOrNull { it.timestampMs }
-
-            val older = ArrayList<ChatMessage>()
-            val newer = ArrayList<ChatMessage>()
-
-            for (row in incoming) {
-                val role = when (row.role.lowercase()) {
-                    "user" -> MessageRole.USER
-                    "assistant" -> MessageRole.ASSISTANT
-                    else -> continue // the transcript only stores conversation turns
-                }
-                if (row.frameId != null && !knownFrameIds.add(row.frameId)) continue
-                if (row.content.isBlank() && row.mediaId == null) continue
-
-                val ts = parseOccurredAt(row.occurredAt)
-                val message = ChatMessage(
-                    role = role,
-                    content = row.content,
-                    frameId = row.frameId,
-                    timestampMs = ts,
-                    mediaId = row.mediaId
-                )
-                if (oldestLocal != null && ts < oldestLocal) older.add(message) else newer.add(message)
-            }
-
-            if (older.isEmpty() && newer.isEmpty()) return 0
-            _messages.value = (older + current + newer).takeLast(MAX_MESSAGES)
-            return older.size + newer.size
+            val result = ChatThreadMerge.merge(_messages.value, incoming, MAX_MESSAGES)
+            if (result.added > 0) _messages.value = result.messages
+            return result.added
         }
     }
-
-    private fun parseOccurredAt(value: String): Long =
-        runCatching { Instant.parse(value).toEpochMilli() }
-            .getOrElse { System.currentTimeMillis() }
 
     // ---------- frame handling ----------
 
