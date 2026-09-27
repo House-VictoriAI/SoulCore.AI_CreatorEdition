@@ -97,7 +97,7 @@ public sealed class SmsInboundService : ISmsInboundService
         // Images are attachments only — never tool args / executable payloads.
         var userVisible = text.Length > 0
             ? text
-            : "[Operator sent a photo]";
+            : "[Kayleigh sent a photo]";
         if (!string.IsNullOrWhiteSpace(mediaId) && text.Length > 0)
             userVisible = text; // caption kept; mediaId on frame
 
@@ -155,7 +155,7 @@ public sealed class SmsInboundService : ISmsInboundService
             // Force no-tools: CompleteAsync only (never CompleteWithToolsAsync).
             var modelPrompt = string.IsNullOrWhiteSpace(mediaId)
                 ? userVisible
-                : userVisible + "\n\n(operator also attached an image; it is stored as media — do not invent tool calls.)";
+                : userVisible + "\n\n(Kayleigh also attached an image; it is stored as media — do not invent tool calls.)";
 
             reply = await _inferenceClient
                 .CompleteAsync(modelPrompt, preamble, cancellationToken)
@@ -292,8 +292,8 @@ public sealed class SmsInboundService : ISmsInboundService
         try
         {
             var episode = string.IsNullOrWhiteSpace(mediaId)
-                ? $"[SMS] Operator → Victoria: {Truncate(userVisible, 200)} | Victoria: {Truncate(reply, 200)}"
-                : $"[SMS] Operator → Victoria: {Truncate(userVisible, 160)} [media={mediaId}] | Victoria: {Truncate(reply, 160)}";
+                ? $"[SMS] Kayleigh → Victoria: {Truncate(userVisible, 200)} | Victoria: {Truncate(reply, 200)}"
+                : $"[SMS] Kayleigh → Victoria: {Truncate(userVisible, 160)} [media={mediaId}] | Victoria: {Truncate(reply, 160)}";
             await _memory.WriteEpisodicAsync(episode, "chat", cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -318,7 +318,7 @@ public sealed class SmsInboundService : ISmsInboundService
         // No ToolAgency / ComputerUse / desktop guidance — SMS must not invite tools.
         var sb = new System.Text.StringBuilder();
         sb.Append(
-            "You are Victoria. The operator just texted you from their phone (SMS). " +
+            "You are Victoria. Kayleigh just texted you from her phone (SMS). " +
             "Reply as a short, warm text message — a few sentences max. " +
             "Do not call tools, open apps, or invent function calls.\n");
         if (recentMemories is { Count: > 0 })

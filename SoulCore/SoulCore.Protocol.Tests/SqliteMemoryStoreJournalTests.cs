@@ -40,7 +40,7 @@ public class SqliteMemoryStoreJournalTests
                 tagsJson: "[\"seed\"]");
             var animId = await store.WriteEntryAsync(
                 "animation",
-                "I want a clear walk cycle and a soft smile when the operator enters.",
+                "I want a clear walk cycle and a soft smile when Kayleigh enters.",
                 tagsJson: "[\"seed\",\"locomotion\"]");
             var envId = await store.WriteEntryAsync(
                 "environment",

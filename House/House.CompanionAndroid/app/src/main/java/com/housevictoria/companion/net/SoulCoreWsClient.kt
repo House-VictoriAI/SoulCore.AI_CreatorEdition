@@ -27,7 +27,14 @@ enum class WsConnectionState {
  * Never log the raw token.
  */
 class SoulCoreWsClient(
-    private val sessionId: String = "companion-android"
+    /**
+     * One Thread (PROP-3 Wave 1). The phone joins the same Host conversation as
+     * ChatDesktop and the SMS bridge rather than a private `companion-android`
+     * session, so desk and phone see one conversation. Matches
+     * `House.ChatDesktop.Services.ChatHistoryStore.PresenceConversationId` and
+     * `SoulCore.Config.SmsOptions.ConversationSessionId`.
+     */
+    private val sessionId: String = ONE_THREAD_SESSION_ID
 ) {
     private val http = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
@@ -136,5 +143,13 @@ class SoulCoreWsClient(
         stateRef.set(next)
         lastError = detail
         onStateChanged?.invoke(next, detail)
+    }
+
+    companion object {
+        /**
+         * Shared operator <-> Victoria conversation id. The handbook glossary
+         * defines One Thread as `presence-local` (desk + SMS); the phone joins it.
+         */
+        const val ONE_THREAD_SESSION_ID = "presence-local"
     }
 }

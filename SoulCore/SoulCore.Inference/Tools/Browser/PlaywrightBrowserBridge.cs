@@ -7,7 +7,7 @@ namespace SoulCore.Inference.Tools.Browser;
 
 /// <summary>
 /// BED-195 Avenue A1: Host Playwright Chromium with Victoria-only user-data-dir.
-/// Never attaches to the operator's daily Chrome profile.
+/// Never attaches to Kayleigh's daily Chrome profile.
 /// </summary>
 public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
 {
@@ -56,7 +56,7 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
             var title = _page is null ? "" : await _page.TitleAsync().ConfigureAwait(false);
             return new BrowserBridgeResult(
                 true,
-                $"playwright ok: Victoria dedicated Chromium (not the operator's Chrome). url={url} title={title}",
+                $"playwright ok: Victoria dedicated Chromium (not Kayleigh's Chrome). url={url} title={title}",
                 new { backend = BackendId, url, title, profile = ResolveUserDataDir(_opts.Value) });
         }
         catch (Exception ex)
@@ -356,7 +356,7 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
         {
             return
                 $"playwright clicked '{label}' (nth={nth}, as {how}). page changed {urlBefore} -> {urlAfter}. " +
-                "goal_complete=false. Call browser_snapshot now to confirm the next screen before telling Kurt you are waiting.";
+                "goal_complete=false. Call browser_snapshot now to confirm the next screen before telling Kayleigh you are waiting.";
         }
 
         return
@@ -532,12 +532,12 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
 
             var userData = ResolveUserDataDir(_opts.Value);
             Directory.CreateDirectory(userData);
-            // Refuse obvious operator Chrome profile paths.
+            // Refuse obvious Kayleigh Chrome profile paths.
             if (userData.Contains("Google" + Path.DirectorySeparatorChar + "Chrome", StringComparison.OrdinalIgnoreCase)
                 || userData.Contains("Microsoft" + Path.DirectorySeparatorChar + "Edge", StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
-                    "PlaywrightUserDataDir must not be the operator's Chrome/Edge profile. Use SoulCore/victoria-browser.");
+                    "PlaywrightUserDataDir must not be Kayleigh's Chrome/Edge profile. Use SoulCore/victoria-browser.");
             }
 
             _playwright ??= await Playwright.CreateAsync().ConfigureAwait(false);
@@ -621,7 +621,7 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
         new(false, FormatPlaywrightError(op, ex), new { action_ok = false, goal_complete = false, backend = BackendId, setup_needed = LooksLikeMissingBrowser(ex) });
 
     /// <summary>
-    /// People-friendly error Victoria can relay to Kurt. Always includes the install
+    /// People-friendly error Victoria can relay to Kayleigh. Always includes the install
     /// recipe when Chromium is missing (navigate/click used to omit it).
     /// </summary>
     public static string FormatPlaywrightError(string op, Exception ex)
@@ -631,8 +631,8 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
         {
             return
                 $"Victoria's browser is not set up yet ({op}). " +
-                "VirtualBox is NOT required for websites — do not ask Kurt to start the VM for this. " +
-                "Kurt: from the Soul_Core repo root run " +
+                "VirtualBox is NOT required for websites — do not ask Kayleigh to start the VM for this. " +
+                "Kayleigh: from the Soul_Core repo root run " +
                 "`powershell -NoProfile -ExecutionPolicy Bypass -File .\\SoulCore\\scripts\\install-playwright.ps1` " +
                 "and wait until it prints FOUND chrome.exe under chromium-1148 (first download can take 5-10 minutes - do not cancel), " +
                 "then `.\\ALLSTART.ps1 -RestartHost`. " +

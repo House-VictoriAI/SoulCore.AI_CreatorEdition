@@ -302,11 +302,62 @@ internal static class FilesystemGuard
             }
             catch (Exception)
             {
-                // fall through to GetFullPath
+                // fall through to POSIX walk / GetFullPath
             }
         }
 
+        // Path.GetFullPath does NOT resolve symlink targets on Linux/macOS, and
+        // FileInfo.ResolveLinkTarget is null for paths that merely *traverse*
+        // a directory symlink (BED-133 escape). Walk each segment and resolve
+        // directory/file links to the final target.
+        try
+        {
+            return ResolvePosixSymlinkPath(path);
+        }
+        catch (Exception)
+        {
+            // fall through
+        }
+
         return Path.GetFullPath(path);
+    }
+
+    /// <summary>
+    /// Walk path segments, resolving any directory/file symlink to its final target.
+    /// </summary>
+    private static string ResolvePosixSymlinkPath(string path)
+    {
+        var full = Path.GetFullPath(path);
+        var root = Path.GetPathRoot(full) ?? Path.DirectorySeparatorChar.ToString();
+        var relative = full;
+        if (!string.IsNullOrEmpty(root) && full.StartsWith(root, StringComparison.Ordinal))
+            relative = full[root.Length..];
+
+        var parts = relative.Split(
+            new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+            StringSplitOptions.RemoveEmptyEntries);
+
+        var current = root;
+        foreach (var part in parts)
+        {
+            current = Path.Combine(current, part);
+            if (Directory.Exists(current))
+            {
+                var dir = new DirectoryInfo(current);
+                var target = dir.ResolveLinkTarget(returnFinalTarget: true);
+                if (target is not null)
+                    current = target.FullName;
+            }
+            else if (File.Exists(current))
+            {
+                var file = new FileInfo(current);
+                var target = file.ResolveLinkTarget(returnFinalTarget: true);
+                if (target is not null)
+                    current = target.FullName;
+            }
+        }
+
+        return Path.GetFullPath(current);
     }
 
     private static bool IsInside(string candidate, string rootWithTrailingSep)

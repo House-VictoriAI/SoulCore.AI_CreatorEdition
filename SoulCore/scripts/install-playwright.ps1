@@ -1,5 +1,5 @@
 # Install Playwright Chromium for SoulCore Host (BED-195 / OPS-198).
-# Soft-fail friendly: ALLSTART only verifies; Kurt runs this once for the download.
+# Soft-fail friendly: ALLSTART only verifies; LinearThrone runs this once for the download.
 #
 # Usage (Windows PowerShell 5.1 is enough - PowerShell 7 / pwsh NOT required):
 #   powershell -NoProfile -ExecutionPolicy Bypass -File .\SoulCore\scripts\install-playwright.ps1
@@ -58,7 +58,7 @@ function Show-ChromiumStatus {
     }
 
     Write-Host "MISSING: chromium-$ChromiumRevision chrome.exe (Host needs this exact revision)" -ForegroundColor Yellow
-    # Helpful: show stray chromium folders so Kurt can see version mismatch.
+    # Helpful: show stray chromium folders so LinearThrone can see version mismatch.
     if (Test-Path -LiteralPath $MsPlaywrightDir) {
         $dirs = Get-ChildItem -Path $MsPlaywrightDir -Directory -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -like 'chromium*' } |

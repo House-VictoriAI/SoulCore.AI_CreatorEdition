@@ -436,7 +436,7 @@ public class ScopedDesktopControlBackendTests
         Assert.Contains("DESKTOP SCOPE", block, StringComparison.Ordinal);
         Assert.Contains("BLOCKED", block, StringComparison.Ordinal);
         Assert.Contains("guest framebuffer", block, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Do NOT ask him to start/turn on VirtualBox for web work", block, StringComparison.Ordinal);
+        Assert.Contains("Do NOT ask Kayleigh to start/turn on VirtualBox for web work", block, StringComparison.Ordinal);
     }
 
     private sealed class RecordingBackend : IDesktopControlBackend

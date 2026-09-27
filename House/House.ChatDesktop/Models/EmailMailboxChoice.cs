@@ -17,16 +17,16 @@ public sealed class EmailMailboxChoice
     public static string TitleFor(string id) => id.Trim().ToLowerInvariant() switch
     {
         "victoria" => "Victoria's mailbox",
-        "personal" => "Kurt's personal mail",
-        "business" => "Kurt's business mail",
+        "personal" => "LinearThrone's personal mail",
+        "business" => "LinearThrone's business mail",
         _ => string.IsNullOrWhiteSpace(id) ? "Mailbox" : id
     };
 
     public static string DefaultDisplayNameFor(string id) => id.Trim().ToLowerInvariant() switch
     {
         "victoria" => "Victoria",
-        "personal" => "Kurt",
-        "business" => "Kurt",
+        "personal" => "LinearThrone",
+        "business" => "LinearThrone",
         _ => ""
     };
 
