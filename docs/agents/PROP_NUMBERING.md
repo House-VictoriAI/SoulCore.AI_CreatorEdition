@@ -1,7 +1,7 @@
 ---
 type: config
 id: PROP-NUMBERING
-updated: 2026-09-15
+updated: 2026-09-27
 owner: PM-01 / TT-01
 ---
 
