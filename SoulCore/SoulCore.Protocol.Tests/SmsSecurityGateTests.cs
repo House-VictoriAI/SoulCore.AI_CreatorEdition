@@ -77,7 +77,11 @@ public class SmsSecurityGateTests
 
         Assert.Equal(0, inference.ToolLoopCalls);
         Assert.Equal(1, inference.CompleteCalls);
-        Assert.Contains("do not invent tool calls", inference.LastSystemPreamble ?? "", StringComparison.OrdinalIgnoreCase);
+        // Wording per BuildSmsPreamble: "Do not call tools, open apps, or invent
+        // function calls." The behavioural gate is ToolLoopCalls == 0 above; this
+        // asserts the preamble also tells the model not to reach for tools.
+        Assert.Contains("do not call tools", inference.LastSystemPreamble ?? "", StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("invent function calls", inference.LastSystemPreamble ?? "", StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

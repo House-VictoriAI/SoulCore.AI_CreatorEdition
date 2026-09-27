@@ -288,9 +288,8 @@ internal static class FilesystemGuard
     /// <summary>
     /// Resolve an existing file/directory to its final path, following any
     /// reparse points (symlinks, junctions). On Windows uses
-    /// <c>GetFinalPathNameByHandle</c>; on other platforms falls back to
-    /// <see cref="Path.GetFullPath"/> (which already resolves POSIX symlinks
-    /// for existing paths via the OS).
+    /// <c>GetFinalPathNameByHandle</c>; elsewhere walks the path components and
+    /// follows POSIX symlinks explicitly.
     /// </summary>
     private static string ResolveExistingFinalPath(string path, bool isDirectory)
     {
@@ -302,11 +301,80 @@ internal static class FilesystemGuard
             }
             catch (Exception)
             {
-                // fall through to GetFullPath
+                // fall through to the component walk
             }
         }
 
-        return Path.GetFullPath(path);
+        return ResolvePosixFinalPath(path);
+    }
+
+    /// <summary>
+    /// Follow POSIX symlinks one path component at a time.
+    /// <see cref="Path.GetFullPath"/> only normalizes lexically — it does not
+    /// read the filesystem — so a symlink sitting inside a whitelisted root can
+    /// point outside it and still satisfy the prefix check. Every ancestor is
+    /// resolved because the link may be any component, not just the leaf.
+    /// </summary>
+    private static string ResolvePosixFinalPath(string path)
+    {
+        // Guards against symlink cycles; POSIX SYMLOOP_MAX is typically 40.
+        const int maxHops = 40;
+
+        string full;
+        try
+        {
+            full = Path.GetFullPath(path);
+        }
+        catch (Exception)
+        {
+            return path;
+        }
+
+        var root = Path.GetPathRoot(full);
+        if (string.IsNullOrEmpty(root))
+            return full;
+
+        var segments = full[root.Length..]
+            .Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                StringSplitOptions.RemoveEmptyEntries);
+
+        var current = root;
+        var hops = 0;
+
+        foreach (var segment in segments)
+        {
+            current = Path.Combine(current, segment);
+
+            while (hops++ < maxHops)
+            {
+                string? resolved;
+                try
+                {
+                    FileSystemInfo info = Directory.Exists(current)
+                        ? new DirectoryInfo(current)
+                        : new FileInfo(current);
+
+                    // LinkTarget is null for ordinary files and for paths that
+                    // do not exist yet (write targets) — nothing to follow.
+                    resolved = info.LinkTarget is null
+                        ? null
+                        : info.ResolveLinkTarget(returnFinalTarget: true)?.FullName;
+                }
+                catch (Exception)
+                {
+                    // Broken or unreadable link: keep the lexical form. The
+                    // caller's prefix check still applies.
+                    break;
+                }
+
+                if (string.IsNullOrEmpty(resolved))
+                    break;
+
+                current = Path.GetFullPath(resolved);
+            }
+        }
+
+        return current;
     }
 
     private static bool IsInside(string candidate, string rootWithTrailingSep)

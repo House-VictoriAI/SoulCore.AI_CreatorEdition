@@ -4,7 +4,9 @@ namespace SoulCore.Host.Companion;
 
 /// <summary>
 /// PROP-1.4: strip EXIF/metadata from outbound MMS JPEGs before carrier send.
-/// Re-encode via ImageSharp (metadata is not copied on save).
+/// Re-encodes via <see cref="ToolImagePayload.TryCompressForVision"/>, which
+/// clears the EXIF/IPTC/XMP profiles explicitly — ImageSharp otherwise carries
+/// them through a save.
 /// </summary>
 public static class SmsMmsImageSanitizer
 {
