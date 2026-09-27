@@ -89,7 +89,7 @@ public class EmailToolsTests
         var result = await tool.ExecuteAsync(Parse("""{"account":"victoria","uid":"v1"}"""));
         Assert.True(result.Success);
         Assert.Contains("welcome to your mailbox", result.Content, StringComparison.Ordinal);
-        Assert.Contains("from: Operator", result.Content, StringComparison.Ordinal);
+        Assert.Contains("from: Kayleigh", result.Content, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public class EmailToolsTests
     {
         var tool = CreateTool("email_send", allowRead: true, allowSend: false, allowDelete: false, out var bridge);
         var result = await tool.ExecuteAsync(Parse(
-            """{"account":"victoria","to":"operator@example.com","subject":"hi","body":"yo","confirmed":true}"""));
+            """{"account":"victoria","to":"Kayleigh@example.com","subject":"hi","body":"yo","confirmed":true}"""));
         Assert.False(result.Success);
         Assert.Contains("AllowEmailSend", result.Content, StringComparison.Ordinal);
         Assert.Empty(bridge.Calls);
@@ -169,10 +169,10 @@ public class EmailToolsTests
     {
         var tool = CreateTool("email_send", allowRead: true, allowSend: true, allowDelete: false, out var bridge);
         var result = await tool.ExecuteAsync(Parse(
-            """{"account":"victoria","to":"operator@example.com","subject":"hi","body":"yo"}"""));
+            """{"account":"victoria","to":"Kayleigh@example.com","subject":"hi","body":"yo"}"""));
         Assert.False(result.Success);
         Assert.Contains("confirm send", result.Content, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("operator@example.com", result.Content, StringComparison.Ordinal);
+        Assert.Contains("Kayleigh@example.com", result.Content, StringComparison.Ordinal);
         Assert.Empty(bridge.Calls);
     }
 
@@ -181,7 +181,7 @@ public class EmailToolsTests
     {
         var tool = CreateTool("email_send", allowRead: true, allowSend: true, allowDelete: false, out var bridge);
         var result = await tool.ExecuteAsync(Parse(
-            """{"account":"victoria","to":"operator@example.com","subject":"hi","body":"yo","confirmed":true}"""));
+            """{"account":"victoria","to":"Kayleigh@example.com","subject":"hi","body":"yo","confirmed":true}"""));
         Assert.True(result.Success);
         Assert.Contains("sent from victoria", result.Content, StringComparison.Ordinal);
         Assert.Contains(bridge.Calls, c => c.StartsWith("send:victoria:", StringComparison.Ordinal));
@@ -282,7 +282,7 @@ public class EmailToolsTests
     {
         var bridge = new InMemoryEmailBridge();
         var victoria = bridge.SeedAccount("victoria", "victoria", "victoria@example.com", "Victoria");
-        victoria.Seed("v1", "Operator <operator@example.com>", "Welcome", "welcome to your mailbox");
+        victoria.Seed("v1", "Kayleigh <Kayleigh@example.com>", "Welcome", "welcome to your mailbox");
         var personal = bridge.SeedAccount("personal", "personal", "personal@example.com", "Personal");
         personal.Seed("p1", "Landlord <rent@example.com>", "Rent invoice", "due Friday");
         personal.Seed("p2", "News <news@example.com>", "old newsletter", "already seen", unread: false);

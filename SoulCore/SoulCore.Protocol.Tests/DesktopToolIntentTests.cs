@@ -143,8 +143,8 @@ public class DesktopToolIntentTests
         Assert.Contains("browser_navigate", once, StringComparison.Ordinal);
         Assert.Contains("browser_click_text", once, StringComparison.Ordinal);
         Assert.Contains("never Process.Start", once, StringComparison.Ordinal);
-        Assert.Contains("Do NOT ask Kurt to turn on VirtualBox", ComputerUseGuidance.Block, StringComparison.Ordinal);
-        Assert.Contains("Do NOT ask him to start/turn on VirtualBox for web work", once, StringComparison.Ordinal);
+        Assert.Contains("Do NOT ask Kayleigh to turn on VirtualBox", ComputerUseGuidance.Block, StringComparison.Ordinal);
+        Assert.Contains("Do NOT ask Kayleigh to start/turn on VirtualBox for web work", once, StringComparison.Ordinal);
         // Full playbook stays; scoped text is appended after it.
         Assert.True(
             once.IndexOf(ComputerUseGuidance.Block, StringComparison.Ordinal)
