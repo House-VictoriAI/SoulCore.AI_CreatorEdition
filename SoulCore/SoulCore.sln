@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoulCore.Protocol", "SoulCo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoulCore.Protocol.Tests", "SoulCore.Protocol.Tests\SoulCore.Protocol.Tests.csproj", "{5537BC99-59E9-400D-9EBB-F875599B353F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "House.ChatDesktop.Tests", "..\House\House.ChatDesktop.Tests\House.ChatDesktop.Tests.csproj", "{98ABEF6F-5EE6-4481-B7E6-2691B41B125A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -153,6 +155,18 @@ Global
 		{5537BC99-59E9-400D-9EBB-F875599B353F}.Release|x64.Build.0 = Release|Any CPU
 		{5537BC99-59E9-400D-9EBB-F875599B353F}.Release|x86.ActiveCfg = Release|Any CPU
 		{5537BC99-59E9-400D-9EBB-F875599B353F}.Release|x86.Build.0 = Release|Any CPU
+		{98ABEF6F-5EE6-4481-B7E6-2691B41B125A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{98ABEF6F-5EE6-4481-B7E6-2691B41B125A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{98ABEF6F-5EE6-4481-B7E6-2691B41B125A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{98ABEF6F-5EE6-4481-B7E6-2691B41B125A}.Debug|x64.Build.0 = Debug|Any CPU
+		{98ABEF6F-5EE6-4481-B7E6-2691B41B125A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{98ABEF6F-5EE6-4481-B7E6-2691B41B125A}.Debug|x86.Build.0 = Debug|Any CPU
+		{98ABEF6F-5EE6-4481-B7E6-2691B41B125A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{98ABEF6F-5EE6-4481-B7E6-2691B41B125A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{98ABEF6F-5EE6-4481-B7E6-2691B41B125A}.Release|x64.ActiveCfg = Release|Any CPU
+		{98ABEF6F-5EE6-4481-B7E6-2691B41B125A}.Release|x64.Build.0 = Release|Any CPU
+		{98ABEF6F-5EE6-4481-B7E6-2691B41B125A}.Release|x86.ActiveCfg = Release|Any CPU
+		{98ABEF6F-5EE6-4481-B7E6-2691B41B125A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

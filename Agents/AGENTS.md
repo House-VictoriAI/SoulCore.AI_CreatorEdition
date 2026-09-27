@@ -40,15 +40,29 @@ Start home worker: `agent worker start --name home-pc` after Windows CLI install
 Dispatch from [cursor.com/agents](https://cursor.com/agents) picking **home-pc**.
 
 ### Build / test / lint (Linux VM)
-- The **entire** `dotnet build SoulCore/SoulCore.sln` builds on Linux (0 warnings),
-  including the Avalonia `House.ChatDesktop`. You can also build individual projects, e.g.
+- The **entire** `dotnet build SoulCore/SoulCore.sln` builds on Linux, including the Avalonia
+  `House.ChatDesktop`. You can also build individual projects, e.g.
   `dotnet build SoulCore/SoulCore.Host/SoulCore.Host.csproj`.
+- It is **not** a 0-warning build. `--no-incremental` reports **7 warnings** on `main`
+  (a plain `dotnet build` under-reports, because unchanged projects are not recompiled):
+  1 × `CS0618` obsolete `RadialGradientBrush.Radius` in `MainWindow.Presence.cs`,
+  1 × `CA1416` Windows-only `VoiceSpeakService` in `VoiceServiceCollectionExtensions.cs`,
+  5 × `CS1998` async-without-await in test files. Do not report "0 warnings" without
+  running `--no-incremental` and counting.
 - The Avalonia packages are pinned to the `11.3.x` line. Avalonia `12.x` was tried and its
   name generator did not emit `InitializeComponent`/`x:Name` fields under this SDK, so keep
   the desktop app on Avalonia 11.3.x unless you verify 12.x generates named controls.
-- Tests: `dotnet test SoulCore/SoulCore.Protocol.Tests/SoulCore.Protocol.Tests.csproj`
-  (xUnit, 62 tests, no external services needed).
-- Lint: there is no ESLint/analyzer config; the practical gate is a 0-warning build plus
+- Tests: `dotnet test SoulCore/SoulCore.sln` runs both suites, no external services needed —
+  `SoulCore.Protocol.Tests` (**716** on `main`, xUnit) and `House.ChatDesktop.Tests` (**6**).
+  Run the whole solution, not just `SoulCore.Protocol.Tests.csproj`: `House.ChatDesktop.Tests`
+  was missing from the `.sln` until now, so desktop tests were silently never executed.
+- **4 of the 716 fail on `main`** (3 SMS/MMS security + 1 filesystem symlink containment).
+  They are real product bugs, not flaky tests. Fixes are in flight on PR #95 and PR #97 —
+  check whether they landed before treating a red suite as your own regression.
+- Lint: there is no ESLint/analyzer config, and **no CI** — `.github/workflows/` does not
+  exist on `main`, which is how 4 failing tests went unnoticed. PR #95 adds the gate.
+  Until it lands, the only gate is what you run locally: `--no-incremental` build with the
+  warning count above, `dotnet test SoulCore/SoulCore.sln`, and
   `dotnet format <project> --verify-no-changes`.
 
 ### Running the backend
