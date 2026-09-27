@@ -74,7 +74,6 @@ Next free `N`: **13**.
 | **PROP-2.4** | REX-01 | Held until PROP-2.1 Pass |
 | **PROP-4.1** | FED-01 | **Partial.** Code half is now PR #98 (cherry-picked onto `main`). Only Windows visual QA is left. ⚠️ **Do not merge `cursor/prop4-presence-drawer-8a1f`** — it is branched from before PROP-7…11 and would delete `Hosting/ServiceCollectionExtensions/*`, `Ws/ChatSendHandler.cs`, `Ws/ChatContextBuilder.cs`, `Ws/ChatPostEffectsHandler.cs` and re-inflate `Program.cs`. The three items were taken off it by path; delete the branch |
 | **PROP-4.2** | OPS-01 | Presence installer + Start shortcut + Velopack update toast — not started |
-| **PROP-12.1** | FED-01 | **Pass** — on `main` (PR #94); Kurt Windows smoke 2026-09-27 |
 | **PROP-3** | — | Parked until SMS QA Pass |
 
 Legacy non-PROP tickets still Pending: `TASK-123`, `TASK-137`, `TASK-139` (QA gates),
