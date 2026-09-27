@@ -32,6 +32,12 @@ internal static class MemoryServiceCollectionExtensions
         services.AddSingleton<IVictoriaJournalStore>(sp => sp.GetRequiredService<SqliteVictoriaJournalRepository>());
         services.AddSingleton<SqliteMemoryStore>(sp => new SqliteMemoryStore(sp.GetRequiredService<SqliteMemorySession>()));
 
+        // PROP-3 Wave 1: durable operator <-> Victoria transcript (migration 007), so a fresh
+        // client can backfill history. Not IMemoryStore (summaries) and not
+        // IChatSessionHistoryStore (bounded RAM context) — see IChatTranscriptStore.
+        services.AddSingleton<SqliteChatTranscriptRepository>();
+        services.AddSingleton<IChatTranscriptStore>(sp => sp.GetRequiredService<SqliteChatTranscriptRepository>());
+
         // Safety / spend layer (BED-080 libs wired by BED-082; TASK-102 hard gate on CapExceeded).
         // PROP-5.3: Charter shares the memory DB file; both serialize via SqlitePathGate on ResolveDbPath().
         services.AddSingleton<CharterService>(_ => new CharterService(memoryOptions.ResolveDbPath()));

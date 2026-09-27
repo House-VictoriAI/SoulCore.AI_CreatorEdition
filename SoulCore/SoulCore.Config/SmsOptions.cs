@@ -11,7 +11,7 @@ public sealed class SmsOptions
     /// <summary>
     /// Canonical Presence / ChatDesktop conversation id for One Thread.
     /// </summary>
-    public string ConversationSessionId { get; set; } = "presence-local";
+    public string ConversationSessionId { get; set; } = PresenceConversation.Id;
 
     /// <summary>
     /// Comma/semicolon/whitespace-separated operator E.164 allowlist

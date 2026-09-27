@@ -40,6 +40,7 @@ public sealed class ChatSendHandler
     private readonly InferenceOptions _inferenceOptions;
     private readonly IToolsAccessSettings _toolsAccess;
     private readonly IPresenceActivityHub? _presenceActivity;
+    private readonly IChatTranscriptStore? _transcript;
     private readonly ILogger<ChatSendHandler> _logger;
 
     public ChatSendHandler(
@@ -56,7 +57,8 @@ public sealed class ChatSendHandler
         IOptions<InferenceOptions> inferenceOptions,
         IToolsAccessSettings toolsAccess,
         ILogger<ChatSendHandler> logger,
-        IPresenceActivityHub? presenceActivity = null)
+        IPresenceActivityHub? presenceActivity = null,
+        IChatTranscriptStore? transcript = null)
     {
         _inference = inference ?? throw new ArgumentNullException(nameof(inference));
         _memory = memory ?? throw new ArgumentNullException(nameof(memory));
@@ -72,6 +74,7 @@ public sealed class ChatSendHandler
         _toolsAccess = toolsAccess ?? throw new ArgumentNullException(nameof(toolsAccess));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _presenceActivity = presenceActivity;
+        _transcript = transcript;
     }
 
     public async Task HandleAsync(
@@ -212,10 +215,56 @@ public sealed class ChatSendHandler
 
         _presenceActivity?.NoteChat("assistant");
 
+        await WriteTranscriptAfterChatAsync(historySessionId, text, reply, frame.Id, cancellationToken)
+            .ConfigureAwait(false);
+
         if (!usedStub)
             await WriteEpisodicAfterChatAsync(modelUserText, reply, provider, cancellationToken).ConfigureAwait(false);
 
         await _postEffects.ApplyAsync(text, reply, dispatchedToolNames, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// PROP-3 Wave 1: append the turn to the durable transcript so other clients can backfill it.
+    /// </summary>
+    /// <remarks>
+    /// Stub replies are recorded, unlike the episodic write above, and the difference is
+    /// deliberate: the transcript reproduces the conversation the operator actually saw on
+    /// screen, while episodic memory is what Victoria genuinely experienced. Dropping stubs here
+    /// would hydrate a thread of user messages with no answers.
+    /// <para>
+    /// Best-effort — a transcript failure must never fail a chat turn the operator already has.
+    /// </para>
+    /// </remarks>
+    private async Task WriteTranscriptAfterChatAsync(
+        string conversationId,
+        string userText,
+        string reply,
+        string? frameId,
+        CancellationToken cancellationToken)
+    {
+        if (_transcript is null)
+            return;
+
+        try
+        {
+            // The assistant row carries the chat.done frame id so a client can recognise a
+            // hydrated row as one it already rendered live. The user row needs a distinct id
+            // because both frames share one inbound id and frame_id is unique.
+            var assistantFrameId = string.IsNullOrWhiteSpace(frameId) ? null : frameId;
+            var userFrameId = assistantFrameId is null ? null : assistantFrameId + ":user";
+
+            await _transcript
+                .AppendAsync(conversationId, "user", userText, "desk", userFrameId, null, cancellationToken)
+                .ConfigureAwait(false);
+            await _transcript
+                .AppendAsync(conversationId, "assistant", reply, "desk", assistantFrameId, null, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Durable transcript append failed for conversation {ConversationId}", conversationId);
+        }
     }
 
     private async Task WriteEpisodicAfterChatAsync(
