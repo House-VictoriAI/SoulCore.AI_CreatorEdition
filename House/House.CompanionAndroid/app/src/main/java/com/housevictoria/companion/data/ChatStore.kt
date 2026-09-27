@@ -2,9 +2,12 @@ package com.housevictoria.companion.data
 
 import android.app.Application
 import android.util.Log
+import com.housevictoria.companion.net.ChatHydrateClient
 import com.housevictoria.companion.net.CompanionConnection
 import com.housevictoria.companion.net.CompanionMediaClient
+import com.housevictoria.companion.net.HydratedMessage
 import com.housevictoria.companion.net.SoulCoreFrame
+import com.housevictoria.companion.net.WsConnectionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,6 +18,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -37,8 +41,19 @@ object ChatStore {
     /** Tail kept on device. The phone is a cache; the Host is the archive. */
     const val MAX_MESSAGES = 500
 
+    /** Suffix the Host files the operator's line under, relative to the `chat.send` id. */
+    const val USER_FRAME_SUFFIX = ":user"
+
+    private const val HYDRATE_PAGE_SIZE = 100
+
+    /** Bounds a single backfill so a very long archive cannot block startup forever. */
+    private const val MAX_HYDRATE_PAGES = 10
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Any()
+
+    /** Highest Host row id already merged. Persisted so backfill stays incremental. */
+    private var hydrateCursor = 0L
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
@@ -59,15 +74,35 @@ object ChatStore {
             restore(application)
             CompanionConnection.frames.collect { frame -> applyFrame(frame) }
         }
+        scope.launch {
+            // Backfill whenever the socket comes up: on a fresh install that is the
+            // whole thread, and after time offline it is whatever the desk said while
+            // the phone was away.
+            CompanionConnection.state.collect { (state, _) ->
+                if (state == WsConnectionState.Connected) hydrate()
+            }
+        }
         Log.i(TAG, "Transcript store installed on CompanionConnection.frames")
     }
 
     // ---------- local appends ----------
 
-    /** Append the operator's own turn (already formatted for display). */
-    fun addUser(content: String) {
+    /**
+     * Append the operator's own turn (already formatted for display).
+     *
+     * [sendFrameId] is the id returned by [com.housevictoria.companion.net.SoulCoreWsClient.sendChat].
+     * The Host files the operator's line under `<frameId>:user`, so recording it here
+     * lets [hydrate] recognise this exact row later instead of appending a copy.
+     */
+    fun addUser(content: String, sendFrameId: String? = null) {
         streamingAssistantId.set(null)
-        append(ChatMessage(role = MessageRole.USER, content = content))
+        append(
+            ChatMessage(
+                role = MessageRole.USER,
+                content = content,
+                frameId = sendFrameId?.let { "$it$USER_FRAME_SUFFIX" }
+            )
+        )
     }
 
     /**
@@ -96,12 +131,117 @@ object ChatStore {
         synchronized(lock) {
             _messages.value = emptyList()
             streamingAssistantId.set(null)
+            // Forget the cursor too, so the next connect re-backfills from the Host
+            // instead of leaving the operator with a permanently empty thread.
+            hydrateCursor = 0L
         }
         scope.launch {
             runCatching { fileFor(app)?.delete() }
                 .onFailure { Log.w(TAG, "Could not delete cached thread", it) }
         }
     }
+
+    // ---------- hydrate from the Host ----------
+
+    /**
+     * Backfill from the Host-durable transcript.
+     *
+     * The device cache only ever held what this phone personally witnessed, so a fresh
+     * install started empty and time spent offline left holes. The Host owns the archive;
+     * this pulls the part we are missing.
+     *
+     * A cold client (cursor 0) asks for the newest page rather than the start of the
+     * conversation, so a long history does not have to be walked to show something useful.
+     * After that it is strictly incremental via `after=<cursor>`.
+     */
+    fun hydrate() {
+        val application = app ?: return
+        scope.launch {
+            val cfg = CompanionPrefs.load(application)
+            var cursor = synchronized(lock) { hydrateCursor }
+            val cold = cursor <= 0L
+            var pages = 0
+            var added = 0
+
+            while (pages++ < MAX_HYDRATE_PAGES) {
+                val page = ChatHydrateClient.fetch(
+                    httpBase = cfg.resolvedHttpBase(),
+                    token = cfg.token,
+                    after = cursor,
+                    limit = HYDRATE_PAGE_SIZE,
+                    recent = cold && pages == 1
+                ).getOrElse { err ->
+                    // Offline or Host down is normal; the cache still renders.
+                    Log.w(TAG, "Hydrate failed (cursor=$cursor)", err)
+                    return@launch
+                }
+
+                added += mergeHydrated(page.messages)
+                if (page.cursor > cursor) cursor = page.cursor
+                if (!page.hasMore || page.messages.isEmpty()) break
+            }
+
+            synchronized(lock) { hydrateCursor = cursor }
+            if (added > 0) {
+                persist()
+                Log.i(TAG, "Hydrated $added message(s) from Host; cursor=$cursor")
+            }
+        }
+    }
+
+    /**
+     * Fold Host rows into the thread, skipping any we already have.
+     *
+     * Dedupe is on `frameId`, which both sides agree on: the Host files a reply under the
+     * `chat.done` frame id and the operator's line under `<id>:user`, and the client
+     * records both. Rows older than everything we hold are prepended as history; newer
+     * rows append. That covers the three real cases — fresh install, a gap while offline,
+     * and backfilling history behind a thread we already partly have.
+     *
+     * @return how many rows were actually added.
+     */
+    private fun mergeHydrated(incoming: List<HydratedMessage>): Int {
+        if (incoming.isEmpty()) return 0
+
+        synchronized(lock) {
+            val current = _messages.value
+            val knownFrameIds = current.mapNotNullTo(HashSet()) { it.frameId }
+            val oldestLocal = current
+                .filter { it.role == MessageRole.USER || it.role == MessageRole.ASSISTANT }
+                .minOfOrNull { it.timestampMs }
+
+            val older = ArrayList<ChatMessage>()
+            val newer = ArrayList<ChatMessage>()
+
+            for (row in incoming) {
+                val role = when (row.role.lowercase()) {
+                    "user" -> MessageRole.USER
+                    "assistant" -> MessageRole.ASSISTANT
+                    else -> continue // the transcript only stores conversation turns
+                }
+                if (row.frameId != null && !knownFrameIds.add(row.frameId)) continue
+                if (row.content.isBlank() && row.mediaId == null) continue
+
+                val ts = parseOccurredAt(row.occurredAt)
+                val message = ChatMessage(
+                    role = role,
+                    content = row.content,
+                    frameId = row.frameId,
+                    timestampMs = ts,
+                    mediaId = row.mediaId
+                )
+                if (oldestLocal != null && ts < oldestLocal) older.add(message) else newer.add(message)
+            }
+
+            if (older.isEmpty() && newer.isEmpty()) return 0
+            _messages.value = (older + current + newer).takeLast(MAX_MESSAGES)
+            return older.size + newer.size
+        }
+    }
+
+    private fun parseOccurredAt(value: String): Long =
+        runCatching { Instant.parse(value).toEpochMilli() }
+            .getOrElse { System.currentTimeMillis() }
 
     // ---------- frame handling ----------
 
@@ -262,11 +402,17 @@ object ChatStore {
                     }
                 )
             }
+            // The cursor rides with the cache so backfill stays incremental across restarts.
+            val root = JSONObject()
+                .put("cursor", synchronized(lock) { hydrateCursor })
+                .put("messages", array)
+                .toString()
+
             // Write-then-rename so a kill mid-write cannot truncate the thread.
             val tmp = File(target.parentFile, "$FILE_NAME.tmp")
-            tmp.writeText(array.toString())
+            tmp.writeText(root)
             if (!tmp.renameTo(target)) {
-                target.writeText(array.toString())
+                target.writeText(root)
                 tmp.delete()
             }
         } catch (e: Exception) {
@@ -279,7 +425,15 @@ object ChatStore {
         if (!source.isFile) return
 
         try {
-            val array = JSONArray(source.readText())
+            val text = source.readText()
+            // Older builds wrote a bare array with no cursor; still read those.
+            val array = if (text.trimStart().startsWith("[")) {
+                JSONArray(text)
+            } else {
+                val root = JSONObject(text)
+                synchronized(lock) { hydrateCursor = root.optLong("cursor", 0L) }
+                root.optJSONArray("messages") ?: JSONArray()
+            }
             val loaded = ArrayList<ChatMessage>(array.length())
             for (i in 0 until array.length()) {
                 val o = array.optJSONObject(i) ?: continue
