@@ -518,9 +518,8 @@ public class OllamaToolLoopTests
     [Fact]
     public async Task ForceToolName_BrowserSnapshot_AllowsBootstrapDesktopOpenApp()
     {
-        // Under ForceToolName=browser_snapshot the model may emit a bootstrap
-        // call first (desktop_open_app). The loop must execute the bootstrap
-        // tool but still keep ForceToolName active until browser_snapshot runs.
+        // Under ForceToolName=browser_snapshot the model may navigate first.
+        // desktop_open_app is not a bootstrap — that alias launches VirtualBox Firefox.
         var handler = new ScriptedHandler(
             new[]
             {
@@ -530,7 +529,7 @@ public class OllamaToolLoopTests
                     {
                         new
                         {
-                            function = new { name = "desktop_open_app", arguments = new { app = "chrome", args = "" } }
+                            function = new { name = "browser_navigate", arguments = new { url = "https://example.com" } }
                         }
                     }),
                 OpenAiChatResponseJson(
@@ -546,7 +545,7 @@ public class OllamaToolLoopTests
             });
 
         var registry = new ScriptedRegistry(
-            ("desktop_open_app", _ => new ToolResult(true, "opened chrome", null)),
+            ("browser_navigate", _ => new ToolResult(true, "navigated", null)),
             ("browser_snapshot", _ => new ToolResult(true, "snapshot ok", null)));
 
         var client = MakeClient(handler, registry: registry);
@@ -556,13 +555,13 @@ public class OllamaToolLoopTests
             {
                 new() { Role = "user", Content = "open the VM browser and snapshot login" }
             },
-            new[] { DesktopOpenAppToolDef(), BrowserSnapshotToolDef(), EchoToolDef() },
+            new[] { BrowserNavigateToolDef(), BrowserSnapshotToolDef(), EchoToolDef() },
             registry,
             loopOptions: new ToolLoopOptions { ForceToolName = "browser_snapshot" });
 
         Assert.Equal("done", result);
         Assert.Equal(3, handler.CallCount);
-        Assert.Contains(registry.Calls, c => c.Name == "desktop_open_app");
+        Assert.Contains(registry.Calls, c => c.Name == "browser_navigate");
         Assert.Contains(registry.Calls, c => c.Name == "browser_snapshot");
 
         // Both iteration 0 and 1 should be forced /v1 until the forced tool

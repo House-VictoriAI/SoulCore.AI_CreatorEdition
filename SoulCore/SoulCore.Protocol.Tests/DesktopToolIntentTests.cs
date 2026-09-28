@@ -142,9 +142,10 @@ public class DesktopToolIntentTests
         Assert.Contains("victoria-sandbox", once, StringComparison.Ordinal);
         Assert.Contains("browser_navigate", once, StringComparison.Ordinal);
         Assert.Contains("browser_click_text", once, StringComparison.Ordinal);
-        Assert.Contains("never Process.Start", once, StringComparison.Ordinal);
-        Assert.Contains("Do NOT ask Kayleigh to turn on VirtualBox", ComputerUseGuidance.Block, StringComparison.Ordinal);
-        Assert.Contains("Do NOT ask Kayleigh to start/turn on VirtualBox for web work", once, StringComparison.Ordinal);
+        Assert.Contains("WEB IS NOT THE VM", once, StringComparison.Ordinal);
+        Assert.Contains("hard error", once, StringComparison.Ordinal);
+        Assert.Contains("Do NOT mention VirtualBox", ComputerUseGuidance.Block, StringComparison.Ordinal);
+        Assert.Contains("Do not tell Kayleigh to start VirtualBox", once, StringComparison.Ordinal);
         // Full playbook stays; scoped text is appended after it.
         Assert.True(
             once.IndexOf(ComputerUseGuidance.Block, StringComparison.Ordinal)
@@ -231,8 +232,8 @@ public class DesktopToolIntentTests
     [InlineData("open chrome to https://example.com", "browser_navigate")]
     [InlineData("open edge", "browser_navigate")]
     [InlineData("start notepad", "desktop_open_app")]
-    [InlineData("open firefox in the vm", "desktop_open_app")]
-    [InlineData("open chrome in virtualbox", "desktop_open_app")]
+    [InlineData("open firefox in the vm", "browser_navigate")]
+    [InlineData("open chrome in virtualbox", "browser_navigate")]
     public void TryMatch_PlaywrightBackend_RoutesBrowserToNavigate(string text, string expectedTool)
     {
         Assert.True(DesktopToolIntent.TryMatch(text, "playwright", out var match));

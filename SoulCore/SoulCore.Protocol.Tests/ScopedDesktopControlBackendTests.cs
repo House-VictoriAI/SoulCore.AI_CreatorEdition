@@ -434,9 +434,9 @@ public class ScopedDesktopControlBackendTests
         var block = ComputerUseGuidance.ScopedBlock("victoria-sandbox");
         Assert.Contains("victoria-sandbox", block, StringComparison.Ordinal);
         Assert.Contains("DESKTOP SCOPE", block, StringComparison.Ordinal);
-        Assert.Contains("BLOCKED", block, StringComparison.Ordinal);
+        Assert.Contains("hard error", block, StringComparison.Ordinal);
         Assert.Contains("guest framebuffer", block, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Do NOT ask Kayleigh to start/turn on VirtualBox for web work", block, StringComparison.Ordinal);
+        Assert.Contains("Do not tell Kayleigh to start VirtualBox", block, StringComparison.Ordinal);
     }
 
     private sealed class RecordingBackend : IDesktopControlBackend

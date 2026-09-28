@@ -23,10 +23,10 @@ public static class ComputerUseGuidance
         "If the tool says URL/title did NOT change, the next screen did not appear — try another label/nth or fill, do not sit and wait.\n" +
         "2) Non-browser desktop apps: call desktop_open_app with an allowlisted alias " +
         "(notepad, explorer, cmd, powershell). Launch is background-friendly.\n" +
-        "If the user asks to open a browser / Chrome / Edge / a website: browser_navigate — NOT desktop_open_app " +
-        "(Playwright is Victoria's browser; VirtualBox Firefox is only for explicit guest-desktop asks).\n" +
+        "If the user asks to open a browser / Chrome / Edge / Firefox / a website: browser_navigate ONLY. " +
+        "desktop_open_app chrome/edge/firefox is refused. There is no guest Firefox path.\n" +
         "If Playwright Chromium is missing (setup_needed / install-playwright.ps1): tell Kayleigh that recipe. " +
-        "Do NOT ask Kayleigh to turn on VirtualBox / the Ubuntu VM for websites — VirtualBox is unrelated to Playwright.\n" +
+        "Do NOT mention VirtualBox, the Ubuntu VM, or Firefox when the ask is a website.\n" +
         "If the user ONLY asked to open/launch a non-browser app, call desktop_open_app once and " +
         "reply in one short sentence — do NOT list windows or screenshot just to verify the launch.\n" +
         "If they asked you to DO something after open (search, click, type, check, navigate, …), " +
@@ -57,24 +57,18 @@ public static class ComputerUseGuidance
     /// Appended after <see cref="Block"/> — does not replace the desktop playbook.
     /// </summary>
     public static string ScopedBlock(string titleContains) =>
-        "DESKTOP SCOPE (hard): drive Victoria's Ubuntu VM '" + titleContains.Trim() + "' " +
-        "(VirtualBox guest) for desktop_* — NOT Kayleigh's Windows desktop.\n" +
-        "Coordinates for desktop_* are the Ubuntu guest framebuffer (origin 0,0, typically ~1280x800) — " +
-        "NOT Windows monitor pixels and NOT the VirtualBox window position on Kayleigh's screens.\n" +
-        "The VirtualBox window does NOT need to be in front or even visible; Kayleigh can keep working.\n" +
-        "desktop_open_app on Kayleigh's Windows host is BLOCKED — never Process.Start Chrome/Notepad there. " +
-        "For notepad/files/terminal only: call desktop_open_app (starts inside Ubuntu via Guest Additions).\n" +
-        "Websites / Chrome / Edge / 'open the browser': NEVER desktop_open_app and NEVER guest Firefox when " +
-        "BrowserBackend=playwright — call browser_navigate (Victoria's Playwright Chromium).\n" +
-        "Website workflow (REQUIRED when BrowserBackend=playwright):\n" +
+        "WEB IS NOT THE VM: websites, Chrome, Edge, Firefox, links, and Login use browser_navigate / " +
+        "browser_snapshot / browser_click_text / browser_fill on Playwright. Never VirtualBox. Never guest Firefox. " +
+        "desktop_open_app chrome/edge/firefox is a hard error.\n" +
+        "DESKTOP SCOPE: non-browser desktop_* may use Ubuntu VM '" + titleContains.Trim() + "' " +
+        "(notepad, files, terminal only) — NOT Kayleigh's Windows desktop and NOT a browser.\n" +
+        "Coordinates for those desktop_* calls are the guest framebuffer (origin 0,0) when the VM path is used.\n" +
+        "Website workflow:\n" +
         "  browser_navigate(url) → browser_snapshot / browser_click_text / browser_fill.\n" +
         "After browser_click_text: browser_snapshot before claiming progress. " +
         "If URL/title did NOT change, do not wait on a popup — pick another control.\n" +
         "If Playwright fails with setup_needed: tell Kayleigh to run install-playwright.ps1. " +
-        "Do NOT ask Kayleigh to start/turn on VirtualBox for web work — the VM is only for desktop_* guest apps.\n" +
-        "Only if Kayleigh explicitly asks for the VirtualBox/guest browser: desktop_open_app firefox. " +
-        "If AT-SPI fails on that guest path (degraded=true, locator=pixel), then desktop_screenshot + desktop_click — " +
-        "do NOT claim Login from PNG alone.\n" +
+        "Do not tell Kayleigh to start VirtualBox for a website.\n" +
         "Do not use the host Chrome extension as Victoria's primary browser.\n" +
         "Guest Additions (SOULCORE_VBOX_GUEST_PASS) preferred for VM desktop; when guest I/O fails the Host falls back " +
         "to the scoped VirtualBox window soft path so screenshots still work.\n" +
@@ -360,8 +354,6 @@ public static class DesktopToolIntent
     {
         if (string.IsNullOrWhiteSpace(text))
             return false;
-        if (WantsGuestBrowser.IsMatch(text))
-            return false;
 
         var alias = ResolveOpenAppAlias(text);
         if (alias is "notepad" or "explorer" or "cmd" or "powershell")
@@ -369,10 +361,15 @@ public static class DesktopToolIntent
         if (alias is "chrome" or "edge" or "msedge" or "firefox")
             return true;
 
+        if (WantsGuestBrowser.IsMatch(text))
+            return false;
+
         var lower = text.ToLowerInvariant();
         return lower.Contains("browser", StringComparison.Ordinal)
                || lower.Contains("website", StringComparison.Ordinal)
                || lower.Contains("web site", StringComparison.Ordinal)
+               || lower.Contains("firefox", StringComparison.Ordinal)
+               || lower.Contains("chrome", StringComparison.Ordinal)
                || TryExtractNavigateUrl(text, out _);
     }
 

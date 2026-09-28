@@ -194,7 +194,7 @@ public sealed class BrowserBackTool : ITool
 
     public ToolDefinition Definition { get; } = new(
         Name: "browser_back",
-        Description: "Go back one page in guest Firefox (Alt+Left inside the Ubuntu VM).",
+        Description: "Go back one page in Victoria's Playwright Chromium (not VirtualBox Firefox).",
         Parameters: Parameters);
 
     public async Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken ct = default)
@@ -223,7 +223,7 @@ public sealed class BrowserTabsTool : ITool
 
     public ToolDefinition Definition { get; } = new(
         Name: "browser_tabs",
-        Description: "List Firefox tabs in the Ubuntu VM (guest accessibility tree).",
+        Description: "List open tabs in Victoria's Playwright Chromium (not the Ubuntu VM).",
         Parameters: Parameters);
 
     public async Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken ct = default)

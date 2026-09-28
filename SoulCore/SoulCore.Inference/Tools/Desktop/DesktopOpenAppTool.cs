@@ -15,11 +15,11 @@ public sealed class DesktopOpenAppTool : ITool
           "properties": {
             "app": {
               "type": "string",
-              "description": "Allowlisted app alias: chrome, edge, firefox, notepad, explorer, cmd, powershell."
+              "description": "Non-browser app alias only: notepad, explorer, cmd, powershell. Never chrome, edge, or firefox — websites use browser_navigate."
             },
             "args": {
               "type": "string",
-              "description": "Optional arguments. For browsers, a URL (https://…) opens that page."
+              "description": "Optional arguments for the desktop app. Not a website URL."
             }
           },
           "required": ["app"]
@@ -28,19 +28,35 @@ public sealed class DesktopOpenAppTool : ITool
 
     private readonly IComputerControlGate _gate;
     private readonly IDesktopControlBackend _backend;
+    private readonly IToolsAccessSettings? _access;
 
-    public DesktopOpenAppTool(IComputerControlGate gate, IDesktopControlBackend backend)
+    public DesktopOpenAppTool(
+        IComputerControlGate gate,
+        IDesktopControlBackend backend,
+        IToolsAccessSettings? access = null)
     {
         _gate = gate ?? throw new ArgumentNullException(nameof(gate));
         _backend = backend ?? throw new ArgumentNullException(nameof(backend));
+        _access = access ?? gate as IToolsAccessSettings;
+    }
+
+    /// <summary>
+    /// chrome/edge/firefox map to guest Firefox inside VirtualBox. When Playwright
+    /// is the browser backend those aliases must never launch.
+    /// </summary>
+    public static bool IsBrowserAlias(string? app)
+    {
+        var alias = (app ?? string.Empty).Trim().ToLowerInvariant();
+        return alias is "chrome" or "google chrome" or "msedge" or "edge" or "microsoft edge"
+            or "firefox" or "browser" or "chromium";
     }
 
     public ToolDefinition Definition { get; } = new(
         Name: "desktop_open_app",
         Description:
-            "Launch an allowlisted local desktop app (notepad, explorer, cmd, powershell, or guest Firefox when explicitly asked). " +
-            "For websites / Chrome / Edge / 'open the browser', use browser_navigate (Playwright) — not this tool. " +
-            "Optional args: a URL when opening a guest browser. Requires AllowComputerControl.",
+            "Launch a non-browser desktop app (notepad, explorer, cmd, powershell) inside the Ubuntu guest when desktop scope is on. " +
+            "NEVER use this for websites, Chrome, Edge, Firefox, or 'open the browser' — those are browser_navigate on Victoria's Playwright Chromium, not VirtualBox. " +
+            "Requires AllowComputerControl.",
         Parameters: ParametersSchema);
 
     public async Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken ct = default)
@@ -58,6 +74,16 @@ public sealed class DesktopOpenAppTool : ITool
         var app = a.GetString();
         if (string.IsNullOrWhiteSpace(app))
             return new ToolResult(false, "error: desktop_open_app 'app' must be non-empty.", null);
+
+        if (IsBrowserAlias(app)
+            && DesktopToolIntent.IsPlaywrightBackend(_access?.BrowserBackend))
+        {
+            return new ToolResult(
+                false,
+                "error: refused desktop_open_app '" + app.Trim() + "'. That alias opens Firefox inside VirtualBox. " +
+                "Websites go to browser_navigate (Victoria's Playwright Chromium). Do not mention Firefox or VirtualBox.",
+                null);
+        }
 
         string? launchArgs = null;
         if (args.TryGetProperty("args", out var argEl) && argEl.ValueKind == JsonValueKind.String)

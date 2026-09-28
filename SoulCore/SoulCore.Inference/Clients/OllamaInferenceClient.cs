@@ -1097,8 +1097,8 @@ public sealed class OllamaInferenceClient : IInferenceClient
         if (string.Equals(forceToolName, "desktop_open_app", StringComparison.Ordinal))
         {
             return
-                "You must call desktop_open_app now with an allowlisted app alias " +
-                "(chrome, edge, firefox, notepad, explorer). Optional args: a URL. " +
+                "You must call desktop_open_app now with a non-browser alias " +
+                "(notepad, explorer, cmd, powershell). Websites are browser_navigate, never Firefox or VirtualBox. " +
                 "Do not list windows or screenshot — emit the tool call only.";
         }
 
@@ -1142,18 +1142,15 @@ public sealed class OllamaInferenceClient : IInferenceClient
                  || string.Equals(toolName, "browser_snapshot", StringComparison.Ordinal)
                  || string.Equals(toolName, "browser_tabs", StringComparison.Ordinal)))
             || (string.Equals(forceToolName, "browser_snapshot", StringComparison.Ordinal)
-             && (string.Equals(toolName, "desktop_open_app", StringComparison.Ordinal)
-                 || string.Equals(toolName, "browser_navigate", StringComparison.Ordinal)
+             && (string.Equals(toolName, "browser_navigate", StringComparison.Ordinal)
                  || string.Equals(toolName, "browser_health", StringComparison.Ordinal)
                  || string.Equals(toolName, "desktop_screenshot", StringComparison.Ordinal)))
             || (string.Equals(forceToolName, "browser_click_text", StringComparison.Ordinal)
-                && (string.Equals(toolName, "desktop_open_app", StringComparison.Ordinal)
-                    || string.Equals(toolName, "browser_navigate", StringComparison.Ordinal)
+                && (string.Equals(toolName, "browser_navigate", StringComparison.Ordinal)
                     || string.Equals(toolName, "browser_snapshot", StringComparison.Ordinal)
                     || string.Equals(toolName, "browser_fill", StringComparison.Ordinal)))
             || (string.Equals(forceToolName, "desktop_screenshot", StringComparison.Ordinal)
-                && (string.Equals(toolName, "desktop_open_app", StringComparison.Ordinal)
-                    || string.Equals(toolName, "browser_navigate", StringComparison.Ordinal))));
+                && string.Equals(toolName, "browser_navigate", StringComparison.Ordinal)));
 
     /// <summary>
     /// Alternates that fulfill the forced intent (consume ForceTool).
@@ -1186,7 +1183,6 @@ public sealed class OllamaInferenceClient : IInferenceClient
         else if (string.Equals(forceToolName, "browser_snapshot", StringComparison.Ordinal))
         {
             yield return "desktop_screenshot";
-            yield return "desktop_open_app";
             yield return "browser_navigate";
             yield return "browser_health";
         }
@@ -1195,11 +1191,9 @@ public sealed class OllamaInferenceClient : IInferenceClient
             yield return "browser_navigate";
             yield return "browser_snapshot";
             yield return "browser_fill";
-            yield return "desktop_open_app";
         }
         else if (string.Equals(forceToolName, "desktop_screenshot", StringComparison.Ordinal))
         {
-            yield return "desktop_open_app";
             yield return "browser_navigate";
         }
     }

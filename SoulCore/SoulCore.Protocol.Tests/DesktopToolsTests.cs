@@ -194,6 +194,35 @@ public class DesktopToolsTests
     }
 
     [Fact]
+    public async Task DesktopOpenApp_PlaywrightBackend_RefusesBrowserAliases()
+    {
+        var backend = new MockDesktopBackend();
+        var gate = new ComputerControlGate(
+            allowDesktopCapture: true,
+            allowBrowserCapture: true,
+            allowComputerControl: true,
+            allowMt4Read: false,
+            allowMt4Trade: false,
+            browserBackend: "playwright");
+        var tool = new DesktopOpenAppTool(gate, backend);
+
+        foreach (var app in new[] { "chrome", "firefox", "edge", "browser" })
+        {
+            var result = await tool.ExecuteAsync(
+                JsonDocument.Parse("{\"app\":\"" + app + "\"}").RootElement);
+            Assert.False(result.Success);
+            Assert.Contains("browser_navigate", result.Content, StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.Empty(backend.OpenAppCalls);
+
+        var notepad = await tool.ExecuteAsync(
+            JsonDocument.Parse("""{"app":"notepad"}""").RootElement);
+        Assert.True(notepad.Success);
+        Assert.Single(backend.OpenAppCalls);
+    }
+
+    [Fact]
     public async Task DesktopOpenApp_GateClosed_RefusesWithSettingsGuidance()
     {
         var backend = new MockDesktopBackend();
