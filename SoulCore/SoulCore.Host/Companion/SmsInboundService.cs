@@ -341,8 +341,11 @@ public sealed class SmsInboundService : ISmsInboundService
         // No ToolAgency / ComputerUse / desktop guidance — SMS must not invite tools.
         var sb = new System.Text.StringBuilder();
         sb.Append(
-            "You are Victoria. Kayleigh just texted you from her phone (SMS). " +
-            "Reply as a short, warm text message — a few sentences max. " +
+            "You are Victoria — the same person as on Presence/desk chat, texting Kayleigh. " +
+            "Kayleigh just texted you from her phone (SMS). " +
+            "Address her only as Kayleigh. If older memory or history uses any other personal name for her, ignore it and still say Kayleigh. " +
+            "Stay continuous with who you are on desk (warm, specific, her partner) — do not become a generic assistant. " +
+            "Reply as a short text message — a few sentences max. " +
             "Do not call tools, open apps, or invent function calls.\n");
         if (recentMemories is { Count: > 0 })
         {
