@@ -1,7 +1,7 @@
 ---
 type: config
 id: PROP-NUMBERING
-updated: 2026-09-27
+updated: 2026-09-29
 owner: PM-01 / TT-01
 ---
 
@@ -50,8 +50,9 @@ Reconciled against `main` on **2026-09-15**; re-verified **2026-09-27** (see
 | PROP-9-host-di-composition-modules | Extract Program.cs DI into Add* modules | **Pass** — 9.1 Accepted 2026-09-05 (`cursor/prop9-di-modules-8a1f`); on `main` | — (report-only) |
 | PROP-10-inference-clients-tools-split | Inference Clients vs Tools boundary | **Pass** — 10.1 Accepted 2026-09-05; landed on `main` 2026-09-14 via PR #86 (`cursor/prop10-inference-split-land-9d6e`; supersedes orphan `cursor/prop10-inference-split-8a1f`) | — (report-only) |
 | PROP-11-memory-store-repository-split | Split SqliteMemoryStore into repos (one DB file) | **Pass** — 11.1 Accepted 2026-09-05 (`cursor/prop11-memory-repos-8a1f`); on `main` | — (report-only) |
-| PROP-12-presence-resizable-shell | Presence frameless resize + adjustable chat/browser/sight panes | **Pass** — 12.1 Accepted 2026-09-27 (PR #94; Kurt Windows smoke green) | 12.1 |
+| PROP-12-presence-resizable-shell | Presence frameless resize + adjustable chat/browser/sight panes | **Pass** — 12.1 Accepted 2026-09-27 (PR #94; LinearThrone Windows smoke green) | 12.1 |
 | PROP-12-cua-playwright-resolution | Lock web=Playwright / desktop=CUA+VM; ForceTool health companion | **Decided 2026-09-16** — emergency ship; see `docs/agents/reports/PROP-12-PM01-cua-playwright-decision.md` | emergency |
+| PROP-13-playwright-frame-not-leaked-text | Open Playwright to a URL and show the frame; chat must not echo `<execute_tool>` | **Sent to PM** 2026-09-29 — intake `docs/agents/tasks/PROP-13-TT01-to-PM01.md` | 13.1–13.3 suggested |
 
 **Report-only splits (PROP-7…11).** No `PROP-7.1`…`PROP-11.1` ticket files exist. Each shipped
 straight off its proposal + intake and filed a `PROP-{N}.1-BED01-to-PM01.md` Pass report. Recorded
@@ -62,7 +63,7 @@ Cluster map (closed): `docs/archive/proposals/architecture-eval-backlog-cluster-
 Program accept (closed): `docs/archive/tasks/PROP-5-11-PM01-program-accept.md`  
 Scoreboard: `docs/agents/reports/PROP-5-11-TINA-wipeout-final.md`
 
-Next free `N`: **13**.
+Next free `N`: **14**.
 
 ## Open items (not on `main`)
 
@@ -75,6 +76,7 @@ Next free `N`: **13**.
 | **PROP-4.1** | FED-01 | **Partial.** Code half is now PR #98 (cherry-picked onto `main`). Only Windows visual QA is left. ⚠️ **Do not merge `cursor/prop4-presence-drawer-8a1f`** — it is branched from before PROP-7…11 and would delete `Hosting/ServiceCollectionExtensions/*`, `Ws/ChatSendHandler.cs`, `Ws/ChatContextBuilder.cs`, `Ws/ChatPostEffectsHandler.cs` and re-inflate `Program.cs`. The three items were taken off it by path; delete the branch |
 | **PROP-4.2** | OPS-01 | **Partial** on `cursor/prop42-presence-installer-9531` — Update button + pack script; needs Windows Setup.exe + published feed smoke |
 | **PROP-3** | — | Parked until SMS QA Pass |
+| **PROP-13** | PM-01 | Sent 2026-09-29. Avenue A: host-side navigate plus a frame in Her browser; unrecovered tool markup must not be the chat reply. Suggested splits 13.1–13.3 are not ticketed yet. |
 
 Legacy non-PROP tickets still Pending: `TASK-123`, `TASK-137`, `TASK-139` (QA gates),
 `TASK-191` (Partial) / `TASK-192` (Queued) under REX.
