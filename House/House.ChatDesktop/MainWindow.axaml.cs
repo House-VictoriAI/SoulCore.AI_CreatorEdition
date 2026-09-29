@@ -27,7 +27,7 @@ public partial class MainWindow : Window
     private readonly SoulCoreDesktopViewClient _desktopView = new();
     private readonly SoulCoreBrowserViewClient _browserView = new();
     private readonly CompanionMediaClient _media = new();
-    private readonly LocalStackControl _stack = new();
+    private readonly LocalStackControl _stack;
     private readonly ChatHistoryStore _chatHistory = new();
     private readonly SoulCoreVoiceClient _voice = new();
     private readonly PushToTalkRecorder _ptt = new();
@@ -41,6 +41,7 @@ public partial class MainWindow : Window
     private bool _toolsAccessHydrating;
     private bool _toolsDefaultsApplied;
     private bool _emailAccountsHydrating;
+    private bool _stackBootstrapBusy;
     private string? _pendingQuote;
     private IReadOnlyList<EmailAccountSnapshot> _emailAccounts = Array.Empty<EmailAccountSnapshot>();
     private bool _servicesBusy;
@@ -99,8 +100,10 @@ public partial class MainWindow : Window
         TranscriptList.ItemsSource = _messages;
         EndpointText.Text = ConnectionDefaults.DisplayEndpoint;
         DisplayNameBox.Text = _uiSettings.DisplayName;
+        _stack = new LocalStackControl(_uiSettings.SoulCoreRepoRoot);
         InitLayoutChrome();
         InitPresenceUpdates();
+        InitStackSettingsUi();
 
         _okBrush = Res("OkBrush");
         _warnBrush = Res("WarnBrush");
@@ -138,6 +141,7 @@ public partial class MainWindow : Window
         {
             LoadChatHistory();
             UpdateIdentityDetail();
+            await EnsureLocalStackOnOpenAsync().ConfigureAwait(true);
             await _ws.ConnectAsync();
             await ProbeHealthAsync();
             _pollTimer.Start();
@@ -553,7 +557,7 @@ public partial class MainWindow : Window
                 Role = "system",
                 Text =
                     "Host WS unavailable — message not sent. " +
-                    $"Start SoulCore.Host on {ConnectionDefaults.WsUri}, then Refresh. " +
+                    $"Start SoulCore.Host on {ConnectionDefaults.WsUri} (Presence auto-starts it when Auto-start is on), then Refresh. " +
                     $"Detail: {_ws.LastError}"
             };
             _messages.Add(err);

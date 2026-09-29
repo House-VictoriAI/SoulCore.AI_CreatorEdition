@@ -16,8 +16,8 @@ Targets `net8.0` (no Windows-only dependencies), so it builds and runs anywhere 
 - **Presence:** chat transcript/input; alive/warm from `presence.status` (HTTP `/health` fallback); emotion strip from `emotion.snapshot`; **Correct…** panel sends `emotion.correct` (SoulCore persists + echoes snapshot); chat via `chat.send` → `chat.delta`/`chat.done`
 - **Settings (day-one tabs):** Identity · Memory · Emotion (points to Presence Correct…; settings store still BED/DBD)
 - **Protocol:** `SoulCoreWsClient` → `ws://127.0.0.1:7700/ws` (BED-021). UI talks only to SoulCore Host (no direct Ollama calls)
-- **Local stack:** Ollama + SoulCore Host required for chat; optional browser bridge / ComfyUI / Unreal avatar
-- **Defaults:** localhost loopback only (`127.0.0.1:7700`). Optional env: `HOUSE_SOULCORE_HOST`, `HOUSE_SOULCORE_PORT`
+- **Local stack:** On open, Presence **auto-starts** Ollama + SoulCore Host when they are down (Settings → System → Auto-start). Installed Setup.exe builds need **SoulCore repo folder** set (or `HOUSE_SOULCORE_REPO`) to the checkout that contains `ALLSTART.ps1`.
+- **Defaults:** localhost loopback only (`127.0.0.1:7700`). Optional env: `HOUSE_SOULCORE_HOST`, `HOUSE_SOULCORE_PORT`, `HOUSE_SOULCORE_REPO`
 - **Secrets:** none in this tree — no App.config keys from quarry
 
 ## UnrealBridge
@@ -29,8 +29,8 @@ Stub docs for SoulCore → UE `:8888` verbs: [`UnrealBridge/README.md`](UnrealBr
 Cross-platform (Linux/macOS/Windows) — the desktop shell needs a graphical display.
 
 ```bash
-# SoulCore Host must be up first for live chat
-# (Host continues if UE :8888 is down)
+# Prefer: open Presence — it starts Host + Ollama when Auto-start is on.
+# Or start Host yourself first:
 dotnet run --project SoulCore/SoulCore.Host -c Release
 
 # Presence shell (Avalonia)

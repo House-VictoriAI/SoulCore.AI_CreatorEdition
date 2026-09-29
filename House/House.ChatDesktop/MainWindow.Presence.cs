@@ -18,6 +18,99 @@ namespace House.ChatDesktop;
 
 public partial class MainWindow
 {
+    private void InitStackSettingsUi()
+    {
+        if (SoulCoreRepoRootBox is not null)
+            SoulCoreRepoRootBox.Text = _uiSettings.SoulCoreRepoRoot ?? _stack.RepoRoot ?? "";
+        if (AutoStartStackCheck is not null)
+            AutoStartStackCheck.IsChecked = _uiSettings.AutoStartStack;
+    }
+
+    private void SoulCoreRepoRootBox_LostFocus(object? sender, RoutedEventArgs e)
+    {
+        PersistStackSettingsFromUi();
+    }
+
+    private void AutoStartStackCheck_Click(object? sender, RoutedEventArgs e)
+    {
+        PersistStackSettingsFromUi();
+    }
+
+    private void PersistStackSettingsFromUi()
+    {
+        var path = SoulCoreRepoRootBox?.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(path))
+            path = null;
+        _uiSettings.SoulCoreRepoRoot = path;
+        _uiSettings.AutoStartStack = AutoStartStackCheck?.IsChecked != false;
+        _uiSettings.Save();
+        _stack.SetConfiguredRepoRoot(path);
+        if (SoulCoreRepoRootBox is not null && string.IsNullOrWhiteSpace(SoulCoreRepoRootBox.Text))
+            SoulCoreRepoRootBox.Text = _stack.RepoRoot ?? "";
+    }
+
+    /// <summary>
+    /// On open: bring up Ollama + Host so an installed Presence can chat without a separate ALLSTART.
+    /// </summary>
+    private async Task EnsureLocalStackOnOpenAsync()
+    {
+        if (!_uiSettings.AutoStartStack)
+            return;
+        if (_stackBootstrapBusy)
+            return;
+        _stackBootstrapBusy = true;
+        try
+        {
+            // Persist discovered root so next launch (Velopack) finds it without env.
+            if (string.IsNullOrWhiteSpace(_uiSettings.SoulCoreRepoRoot)
+                && !string.IsNullOrWhiteSpace(_stack.RepoRoot))
+            {
+                _uiSettings.SoulCoreRepoRoot = _stack.RepoRoot;
+                _uiSettings.Save();
+                if (SoulCoreRepoRootBox is not null)
+                    SoulCoreRepoRootBox.Text = _stack.RepoRoot;
+            }
+
+            AppendSystemNotice("Starting local stack (Host + Ollama) if needed…");
+            var progress = new Progress<string>(msg =>
+            {
+                if (ServicesStatusText is not null)
+                    ServicesStatusText.Text = msg;
+            });
+
+            var result = await _stack.EnsureStackForChatAsync(progress: progress).ConfigureAwait(true);
+            if (result.Ok)
+            {
+                AppendSystemNotice(
+                    result.HostStarted || result.OllamaStarted
+                        ? $"Stack ready — {result.Detail}"
+                        : "Stack already running.");
+            }
+            else
+            {
+                AppendSystemNotice($"Could not auto-start stack: {result.Detail}");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendSystemNotice($"Stack auto-start error: {ex.Message}");
+        }
+        finally
+        {
+            _stackBootstrapBusy = false;
+        }
+    }
+
+    private void AppendSystemNotice(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+        var msg = new ChatMessage { Role = "system", Text = text };
+        _messages.Add(msg);
+        try { PersistMessage(msg); } catch { /* best-effort */ }
+        ScrollTranscriptToEnd();
+    }
+
     private async Task ProbeHealthAsync()
     {
         var snap = await _health.ProbeAsync();
@@ -296,8 +389,13 @@ public partial class MainWindow
             switch (tag)
             {
                 case "host-start":
-                    result = await _stack.StartHostAsync().ConfigureAwait(true);
+                {
+                    var ensure = await _stack.EnsureStackForChatAsync().ConfigureAwait(true);
+                    result = ensure.Ok
+                        ? LocalStackActionResult.Succeed(ensure.Detail)
+                        : LocalStackActionResult.Fail(ensure.Detail);
                     break;
+                }
                 case "host-stop":
                     result = await _stack.StopHostAsync().ConfigureAwait(true);
                     break;
