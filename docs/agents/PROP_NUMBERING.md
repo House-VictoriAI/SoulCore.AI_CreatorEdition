@@ -52,7 +52,7 @@ Reconciled against `main` on **2026-09-15**; re-verified **2026-09-27** (see
 | PROP-11-memory-store-repository-split | Split SqliteMemoryStore into repos (one DB file) | **Pass** — 11.1 Accepted 2026-09-05 (`cursor/prop11-memory-repos-8a1f`); on `main` | — (report-only) |
 | PROP-12-presence-resizable-shell | Presence frameless resize + adjustable chat/browser/sight panes | **Pass** — 12.1 Accepted 2026-09-27 (PR #94; LinearThrone Windows smoke green) | 12.1 |
 | PROP-12-cua-playwright-resolution | Lock web=Playwright / desktop=CUA+VM; ForceTool health companion | **Decided 2026-09-16** — emergency ship; see `docs/agents/reports/PROP-12-PM01-cua-playwright-decision.md` | emergency |
-| PROP-13-playwright-frame-not-leaked-text | Open Playwright to a URL and show the frame; chat must not echo `<execute_tool>` | **Sent to PM** 2026-09-29 — intake `docs/agents/tasks/PROP-13-TT01-to-PM01.md` | 13.1–13.3 suggested |
+| PROP-13-playwright-frame-not-leaked-text | Open Playwright to a URL and show the frame; chat must not echo `<execute_tool>` | **BED Pass** 2026-09-29 — Avenue A 13.1–13.3; QA Windows smoke pending | 13.1–13.3 BED |
 
 **Report-only splits (PROP-7…11).** No `PROP-7.1`…`PROP-11.1` ticket files exist. Each shipped
 straight off its proposal + intake and filed a `PROP-{N}.1-BED01-to-PM01.md` Pass report. Recorded
@@ -76,7 +76,7 @@ Next free `N`: **14**.
 | **PROP-4.1** | FED-01 | **Partial.** Code half is now PR #98 (cherry-picked onto `main`). Only Windows visual QA is left. ⚠️ **Do not merge `cursor/prop4-presence-drawer-8a1f`** — it is branched from before PROP-7…11 and would delete `Hosting/ServiceCollectionExtensions/*`, `Ws/ChatSendHandler.cs`, `Ws/ChatContextBuilder.cs`, `Ws/ChatPostEffectsHandler.cs` and re-inflate `Program.cs`. The three items were taken off it by path; delete the branch |
 | **PROP-4.2** | OPS-01 | **Partial** on `cursor/prop42-presence-installer-9531` — Update button + pack script; needs Windows Setup.exe + published feed smoke |
 | **PROP-3** | — | Parked until SMS QA Pass |
-| **PROP-13** | PM-01 | Sent 2026-09-29. Avenue A: host-side navigate plus a frame in Her browser; unrecovered tool markup must not be the chat reply. Suggested splits 13.1–13.3 are not ticketed yet. |
+| **PROP-13** | BED-01 | Ticketed 2026-09-29. Avenue A: 13.1 intent+URL, 13.2 reply firewall, 13.3 capture gate + private-host reject. |
 
 Legacy non-PROP tickets still Pending: `TASK-123`, `TASK-137`, `TASK-139` (QA gates),
 `TASK-191` (Partial) / `TASK-192` (Queued) under REX.

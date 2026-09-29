@@ -140,4 +140,44 @@ public class PlaywrightBrowserBridgeTests
         Assert.DoesNotContain("install-playwright.ps1", msg, StringComparison.OrdinalIgnoreCase);
         Assert.False(PlaywrightBrowserBridge.LooksLikeMissingBrowser(ex));
     }
+
+    [Theory]
+    [InlineData("http://127.0.0.1/")]
+    [InlineData("http://localhost:8080/")]
+    [InlineData("http://10.0.0.1/")]
+    [InlineData("http://192.168.1.1/")]
+    [InlineData("http://172.16.5.1/")]
+    [InlineData("http://169.254.169.254/latest/meta-data/")]
+    [InlineData("http://metadata.google.internal/")]
+    public void IsDisallowedNavigateHost_RejectsPrivateAndMetadata(string url)
+    {
+        Assert.True(PlaywrightBrowserBridge.IsDisallowedNavigateHost(url));
+    }
+
+    [Theory]
+    [InlineData("https://example.com/")]
+    [InlineData("https://www.wikipedia.org/wiki/Test")]
+    public void IsDisallowedNavigateHost_AllowsPublicHttps(string url)
+    {
+        Assert.False(PlaywrightBrowserBridge.IsDisallowedNavigateHost(url));
+    }
+
+    [Fact]
+    public async Task Navigate_PrivateHost_RefusedWithoutPublish()
+    {
+        var opts = Options.Create(new ToolsOptions
+        {
+            BrowserBackend = ToolsOptions.BackendPlaywright,
+            AllowBrowserCapture = true,
+            PlaywrightHeaded = false,
+            PlaywrightUserDataDir = Path.Combine(Path.GetTempPath(), "soulcore-pw-priv-" + Guid.NewGuid().ToString("N"))
+        });
+        var hub = new VictoriaBrowserViewHub();
+        await using var bridge = new PlaywrightBrowserBridge(opts, log: null, view: hub);
+
+        var nav = await bridge.NavigateAsync("http://127.0.0.1/");
+        Assert.False(nav.Success);
+        Assert.Contains("refused", nav.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.False(hub.GetSnapshot().HasImage);
+    }
 }

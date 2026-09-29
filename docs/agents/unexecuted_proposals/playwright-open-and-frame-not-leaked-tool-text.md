@@ -1,6 +1,6 @@
 ---
 type: proposal
-status: sent-to-pm
+status: accepted-pm-ticketed
 tt_id: TT-01
 prop_id: PROP-13-playwright-frame-not-leaked-text
 created: 2026-09-29
@@ -9,6 +9,7 @@ sent_at: 2026-09-29
 title: Playwright open-and-frame must run, not echo tool markup
 need: Asking Victoria to open Playwright to a site and capture a frame returns a markup-only bubble and publishes no frame in either pane
 pm_intake: docs/agents/tasks/PROP-13-TT01-to-PM01.md
+pm_tickets: docs/agents/tasks/PROP-13.1-PM01-to-BED01.md, docs/agents/tasks/PROP-13.2-PM01-to-BED01.md, docs/agents/tasks/PROP-13.3-PM01-to-BED01.md
 ---
 
 # Playwright open-and-frame must run, not echo tool markup

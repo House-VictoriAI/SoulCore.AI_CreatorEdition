@@ -218,6 +218,15 @@ public sealed class OllamaInferenceClient : IInferenceClient
             cap,
             toolNumCtx);
 
+        // PROP-13: browser_navigate without an http(s) URL → ask, no model, no about:blank.
+        if (string.Equals(forceToolName, "browser_navigate", StringComparison.Ordinal)
+            && !DesktopToolIntent.TryExtractNavigateUrl(GetLastUserContent(ollamaMessages), out _))
+        {
+            _logger.LogInformation(
+                "Ollama ForceTool browser_navigate aborted — no http(s) URL in user message.");
+            return DesktopToolIntent.MissingNavigateUrlReply;
+        }
+
         if (!string.IsNullOrEmpty(forceToolName)
             && (TrySoftDispatchForcedOpenApp(forceToolName, ollamaMessages, out var preOpenCalls)
                 || TrySoftDispatchForcedTool(forceToolName, ollamaMessages, out preOpenCalls))
@@ -226,8 +235,12 @@ public sealed class OllamaInferenceClient : IInferenceClient
                 || string.Equals(forceToolName, "browser_navigate", StringComparison.Ordinal)))
         {
             var lastUser = GetLastUserContent(ollamaMessages);
-            var pureOpen = DesktopToolIntent.IsPureOpenPrompt(lastUser);
-            // Complex "open URL and …" prompts: do NOT pre-consume ForceTool.
+            // PROP-13: capture/frame-only follow-on is satisfied by navigate publish —
+            // do not defer pre-dispatch.
+            var pureOpen = DesktopToolIntent.IsPureOpenPrompt(lastUser, "playwright")
+                || (string.Equals(forceToolName, "browser_navigate", StringComparison.Ordinal)
+                    && DesktopToolIntent.IsCaptureOnlyBrowserAsk(lastUser));
+            // Complex "open URL and click/type…" prompts: do NOT pre-consume ForceTool.
             // Keep exclusive force + companions (browser_health/snapshot) so the
             // model can health-check then navigate without a refused tool stall.
             if (string.Equals(forceToolName, "browser_navigate", StringComparison.Ordinal)
@@ -240,11 +253,6 @@ public sealed class OllamaInferenceClient : IInferenceClient
             {
             DesktopToolIntent.TryResolveOpenAppLaunch(lastUser, out var openApp, out var openArgs);
             DesktopToolIntent.TryExtractNavigateUrl(lastUser, out var navigateUrl);
-            if (string.Equals(forceToolName, "browser_navigate", StringComparison.Ordinal)
-                && string.IsNullOrWhiteSpace(navigateUrl))
-            {
-                navigateUrl = DesktopToolIntent.DefaultPlaywrightOpenUrl;
-            }
 
             ollamaMessages.Add(new OllamaChatMessage
             {
@@ -284,15 +292,15 @@ public sealed class OllamaInferenceClient : IInferenceClient
                         "Ollama ForceTool {Tool} early-exit (pure open): {Reply}",
                         forceToolName,
                         reply);
-                    return reply;
+                    return FirewallAssistantReply(reply);
                 }
 
                 // Launch failed — surface the tool error without more LLM rounds.
-                return string.IsNullOrWhiteSpace(toolContent)
+                return FirewallAssistantReply(string.IsNullOrWhiteSpace(toolContent)
                     ? (string.Equals(forceToolName, "browser_navigate", StringComparison.Ordinal)
                         ? "I couldn't open Victoria's browser."
                         : "I couldn't open that app.")
-                    : toolContent!;
+                    : toolContent!);
             }
 
             // Non-pure open (e.g. "open Chrome and click…") — continue loop with
@@ -519,9 +527,10 @@ public sealed class OllamaInferenceClient : IInferenceClient
                         loopSw.ElapsedMilliseconds);
                     // Prefer any earlier non-empty assistant text when the final
                     // post-tool turn is blank (gemma4 habit after desktop_open_app).
-                    return !string.IsNullOrWhiteSpace(assistantText)
+                    var textReply = !string.IsNullOrWhiteSpace(assistantText)
                         ? assistantText
                         : lastAssistantText;
+                    return FirewallAssistantReply(textReply);
                 }
             }
 
@@ -630,7 +639,21 @@ public sealed class OllamaInferenceClient : IInferenceClient
             loopSw.ElapsedMilliseconds);
         return string.IsNullOrEmpty(lastAssistantText)
             ? IterationCapMarker
-            : lastAssistantText;
+            : FirewallAssistantReply(lastAssistantText);
+    }
+
+    /// <summary>
+    /// PROP-13.2: never surface unrecovered tool markup as the chat bubble.
+    /// Does not log tag arguments.
+    /// </summary>
+    private string FirewallAssistantReply(string? reply)
+    {
+        if (string.IsNullOrWhiteSpace(reply))
+            return reply ?? string.Empty;
+        if (!ToolCallTextRecovery.LooksLikeUnrecoveredToolMarkup(reply))
+            return reply;
+        _logger.LogWarning("Ollama reply firewall: stripped unrecovered tool markup from assistant reply.");
+        return "I couldn't complete that tool action. Please try again.";
     }
 
     private static List<OllamaChatMessage> BuildInitialMessages(IReadOnlyList<ChatMessage> messages)
@@ -1030,8 +1053,9 @@ public sealed class OllamaInferenceClient : IInferenceClient
                 argsJson = "{}";
                 break;
             case "browser_navigate":
+                // PROP-13: never invent about:blank — caller must supply http(s).
                 if (!DesktopToolIntent.TryExtractNavigateUrl(lastUser, out var url))
-                    url = DesktopToolIntent.DefaultPlaywrightOpenUrl;
+                    return false;
                 argsJson = "{\"url\":" + JsonSerializer.Serialize(url) + "}";
                 break;
             case "browser_snapshot":
