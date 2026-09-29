@@ -272,15 +272,18 @@ $r2 = Invoke-WebRequest -Uri 'http://127.0.0.1:11434/api/tags' -UseBasicParsing 
     {
         try
         {
+            var resolvedExe = ResolveWindowsExecutable(fileName) ?? fileName;
             var psi = new ProcessStartInfo
             {
-                FileName = fileName,
+                FileName = resolvedExe,
                 WorkingDirectory = workingDirectory,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
             };
+            // Start Menu / Velopack launches often miss User PATH (dotnet).
+            EnrichPathForStackTools(psi);
             foreach (var a in args)
                 psi.ArgumentList.Add(a);
 
@@ -306,6 +309,50 @@ $r2 = Invoke-WebRequest -Uri 'http://127.0.0.1:11434/api/tags' -UseBasicParsing 
         catch (Exception ex)
         {
             return LocalStackActionResult.Fail(ex.Message);
+        }
+    }
+
+    private static string? ResolveWindowsExecutable(string fileName)
+    {
+        if (!OperatingSystem.IsWindows())
+            return null;
+        if (fileName.Equals("powershell.exe", StringComparison.OrdinalIgnoreCase)
+            || fileName.Equals("powershell", StringComparison.OrdinalIgnoreCase))
+        {
+            var systemRoot = Environment.GetFolderPath(Environment.SpecialFolder.System);
+            var candidate = Path.Combine(systemRoot, "WindowsPowerShell", "v1.0", "powershell.exe");
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        return null;
+    }
+
+    private static void EnrichPathForStackTools(ProcessStartInfo psi)
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+        try
+        {
+            var path = Environment.GetEnvironmentVariable("PATH") ?? "";
+            var extras = new[]
+            {
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "dotnet"),
+                Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Microsoft", "dotnet"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
+                    "WindowsPowerShell", "v1.0"),
+            };
+            var prefix = string.Join(Path.PathSeparator, extras.Where(Directory.Exists));
+            if (string.IsNullOrEmpty(prefix))
+                return;
+            psi.Environment["PATH"] = prefix + Path.PathSeparator + path;
+        }
+        catch
+        {
+            // best-effort
         }
     }
 

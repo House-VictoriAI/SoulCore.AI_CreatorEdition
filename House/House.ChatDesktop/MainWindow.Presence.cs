@@ -45,17 +45,17 @@ public partial class MainWindow
         _uiSettings.AutoStartStack = AutoStartStackCheck?.IsChecked != false;
         _uiSettings.Save();
         _stack.SetConfiguredRepoRoot(path);
+        CompanionToken.TryLoadFromEnvFile(path ?? _stack.RepoRoot);
         if (SoulCoreRepoRootBox is not null && string.IsNullOrWhiteSpace(SoulCoreRepoRootBox.Text))
             SoulCoreRepoRootBox.Text = _stack.RepoRoot ?? "";
     }
 
     /// <summary>
     /// On open: bring up Ollama + Host so an installed Presence can chat without a separate ALLSTART.
+    /// Always reloads companion token from SoulCore/.env (Velopack installs are outside the repo).
     /// </summary>
     private async Task EnsureLocalStackOnOpenAsync()
     {
-        if (!_uiSettings.AutoStartStack)
-            return;
         if (_stackBootstrapBusy)
             return;
         _stackBootstrapBusy = true;
@@ -71,7 +71,26 @@ public partial class MainWindow
                     SoulCoreRepoRootBox.Text = _stack.RepoRoot;
             }
 
-            AppendSystemNotice("Starting local stack (Host + Ollama) if needed…");
+            // Critical for Setup.exe installs: Program.cs ran too early to find SoulCore/.env.
+            ReloadCompanionTokenFromRepo();
+
+            if (!_uiSettings.AutoStartStack)
+            {
+                AppendSystemNotice(
+                    $"Auto-start off. {CompanionToken.DescribePresence()}. " +
+                    "Turn on Settings → System → Auto-start, or run ALLSTART.");
+                return;
+            }
+
+            if (_stack.RepoRoot is null)
+            {
+                AppendSystemNotice(
+                    "SoulCore repo not found — set Settings → System → SoulCore repo folder " +
+                    @"(e.g. C:\Users\kurtw\Soul_Core) then reopen Presence.");
+                return;
+            }
+
+            AppendSystemNotice($"Starting local stack from {_stack.RepoRoot}…");
             var progress = new Progress<string>(msg =>
             {
                 if (ServicesStatusText is not null)
@@ -79,12 +98,16 @@ public partial class MainWindow
             });
 
             var result = await _stack.EnsureStackForChatAsync(progress: progress).ConfigureAwait(true);
+            // Host may have loaded .env; Presence must match before WS connect.
+            ReloadCompanionTokenFromRepo();
+
             if (result.Ok)
             {
                 AppendSystemNotice(
-                    result.HostStarted || result.OllamaStarted
+                    (result.HostStarted || result.OllamaStarted
                         ? $"Stack ready — {result.Detail}"
-                        : "Stack already running.");
+                        : "Stack already running.")
+                    + $" · {CompanionToken.DescribePresence()}");
             }
             else
             {
@@ -98,6 +121,23 @@ public partial class MainWindow
         finally
         {
             _stackBootstrapBusy = false;
+        }
+    }
+
+    private void ReloadCompanionTokenFromRepo()
+    {
+        var root = _uiSettings.SoulCoreRepoRoot ?? _stack.RepoRoot;
+        var applied = CompanionToken.TryLoadFromEnvFile(root);
+        var envPath = CompanionToken.ResolvedEnvFilePath(root);
+        if (applied > 0)
+        {
+            if (ServicesStatusText is not null)
+                ServicesStatusText.Text = $"Loaded {applied} SOULCORE_* from .env";
+        }
+        else if (envPath is null)
+        {
+            AppendSystemNotice(
+                "No SoulCore/.env found for companion token. Set SoulCore repo folder in Settings → System.");
         }
     }
 

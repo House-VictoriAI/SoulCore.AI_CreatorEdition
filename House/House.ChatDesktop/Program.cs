@@ -16,7 +16,10 @@ internal static class Program
             .Run();
 
         // Host /ws requires Bearer when SOULCORE_COMPANION_API_TOKEN is set (phone + desktop).
-        CompanionToken.TryLoadFromEnvFile();
+        // Best-effort early load for repo launches; Velopack installs reload again after
+        // LocalUiSettings resolves SoulCoreRepoRoot (see EnsureLocalStackOnOpenAsync).
+        var settings = LocalUiSettings.Load();
+        CompanionToken.TryLoadFromEnvFile(settings.SoulCoreRepoRoot);
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 
