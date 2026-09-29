@@ -1,7 +1,7 @@
 ---
 type: config
 id: PROP-NUMBERING
-updated: 2026-09-15
+updated: 2026-09-27
 owner: PM-01 / TT-01
 ---
 
@@ -50,7 +50,7 @@ Reconciled against `main` on **2026-09-15**; re-verified **2026-09-27** (see
 | PROP-9-host-di-composition-modules | Extract Program.cs DI into Add* modules | **Pass** — 9.1 Accepted 2026-09-05 (`cursor/prop9-di-modules-8a1f`); on `main` | — (report-only) |
 | PROP-10-inference-clients-tools-split | Inference Clients vs Tools boundary | **Pass** — 10.1 Accepted 2026-09-05; landed on `main` 2026-09-14 via PR #86 (`cursor/prop10-inference-split-land-9d6e`; supersedes orphan `cursor/prop10-inference-split-8a1f`) | — (report-only) |
 | PROP-11-memory-store-repository-split | Split SqliteMemoryStore into repos (one DB file) | **Pass** — 11.1 Accepted 2026-09-05 (`cursor/prop11-memory-repos-8a1f`); on `main` | — (report-only) |
-| PROP-12-presence-resizable-shell | Presence frameless resize + adjustable chat/browser/sight panes | **Open** — 12.1 FED **Partial** (build+unit tests; Windows visual QA) | 12.1 |
+| PROP-12-presence-resizable-shell | Presence frameless resize + adjustable chat/browser/sight panes | **Pass** — 12.1 Accepted 2026-09-27 (PR #94; Kurt Windows smoke green) | 12.1 |
 | PROP-12-cua-playwright-resolution | Lock web=Playwright / desktop=CUA+VM; ForceTool health companion | **Decided 2026-09-16** — emergency ship; see `docs/agents/reports/PROP-12-PM01-cua-playwright-decision.md` | emergency |
 
 **Report-only splits (PROP-7…11).** No `PROP-7.1`…`PROP-11.1` ticket files exist. Each shipped
@@ -74,7 +74,6 @@ Next free `N`: **13**.
 | **PROP-2.4** | REX-01 | Held until PROP-2.1 Pass |
 | **PROP-4.1** | FED-01 | **Partial.** Code half is now PR #98 (cherry-picked onto `main`). Only Windows visual QA is left. ⚠️ **Do not merge `cursor/prop4-presence-drawer-8a1f`** — it is branched from before PROP-7…11 and would delete `Hosting/ServiceCollectionExtensions/*`, `Ws/ChatSendHandler.cs`, `Ws/ChatContextBuilder.cs`, `Ws/ChatPostEffectsHandler.cs` and re-inflate `Program.cs`. The three items were taken off it by path; delete the branch |
 | **PROP-4.2** | OPS-01 | Presence installer + Start shortcut + Velopack update toast — not started |
-| **PROP-12.1** | FED-01 | **Partial** on `cursor/presence-resizable-panes-9531` — needs Windows smoke (resize / maximize / splitters / restore) |
 | **PROP-3** | — | Parked until SMS QA Pass |
 
 Legacy non-PROP tickets still Pending: `TASK-123`, `TASK-137`, `TASK-139` (QA gates),

@@ -5,9 +5,9 @@ prop_root: PROP-12-presence-resizable-shell
 from: PM-01
 to: FED-01
 priority: P1
-status: Reported (Partial)
+status: Accepted (Pass)
 created: 2026-09-16
-updated: 2026-09-16
+updated: 2026-09-27
 wave: presence-layout
 title: Presence frameless resize + inner pane splitters + persist
 depends_on: none
@@ -34,12 +34,13 @@ intake: docs/agents/tasks/PROP-12-TT01-to-PM01.md
 
 ## Acceptance
 
-- [x] Drag window edges/corners to resize when restored *(code; Windows QA pending)*
-- [x] Maximize ↔ restore via button and title double-click *(code; Windows QA pending)*
-- [x] Drag splitters to change chat vs browser vs sight sizes *(code; Windows QA pending)*
-- [x] Restart Presence: sizes restore from `ui-settings.json` *(persist path unit-tested; Windows QA pending)*
+- [x] Drag window edges/corners to resize when restored
+- [x] Maximize ↔ restore via button and title double-click
+- [x] Drag splitters to change chat vs browser vs sight sizes
+- [x] Restart Presence: sizes restore from `ui-settings.json`
 - [x] `dotnet build` ChatDesktop succeeds; unit tests for settings round-trip
 
-## Report
+## Report / Accept
 
-`docs/agents/reports/PROP-12.1-FED01-to-PM01.md`
+- `docs/agents/reports/PROP-12.1-FED01-to-PM01.md`
+- `docs/agents/reports/PROP-12.1-PM01-accept.md` (Pass 2026-09-27)

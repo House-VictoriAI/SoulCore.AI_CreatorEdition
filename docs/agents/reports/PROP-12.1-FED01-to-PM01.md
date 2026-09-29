@@ -5,17 +5,19 @@ prop_root: PROP-12-presence-resizable-shell
 from: FED-01
 to: PM-01
 priority: P1
-status: Partial
+status: Pass
 created: 2026-09-16
+updated: 2026-09-27
 branch: cursor/presence-resizable-panes-9531
-environment: Linux cloud agent (TINA-main tree)
+environment: Linux cloud agent (TINA-main tree); Windows Presence QA by Kurt
 proposal: docs/agents/unexecuted_proposals/presence-resizable-shell.md
 intake: docs/agents/tasks/PROP-12.1-PM01-to-FED01.md
+accept: docs/agents/reports/PROP-12.1-PM01-accept.md
 ---
 
 # PROP-12.1 — Presence resize + pane splitters (FED-01 → PM-01)
 
-**Verdict: Partial** — frameless resize, maximize, GridSplitters, and layout persistence are implemented and build/unit-tested. Full drag/maximize visual QA needs Kurt's Windows Presence box (ChatDesktop is WinExe).
+**Verdict: Pass** — frameless resize, maximize, GridSplitters, and layout persistence shipped (PR #94). Kurt Windows smoke 2026-09-27: resize / maximize / splitters / restore all green.
 
 ## What shipped
 
@@ -42,10 +44,9 @@ dotnet test House/House.ChatDesktop.Tests/House.ChatDesktop.Tests.csproj -c Rele
 Passed!  - Failed: 0, Passed: 2
 ```
 
-## Partial — why not Pass
+## Windows QA (2026-09-27)
 
-1. No GUI walkthrough on this Linux agent — Presence shell does not run as a full Windows frameless desktop here.
-2. Kurt should smoke: edge resize, maximize/restore, both splitters, restart and confirm `%LocalAppData%\HouseVictoria\ui-settings.json` restores sizes.
+Kurt: edge/corner resize, maximize/restore, both splitters, restart restore — **pass; nothing broken.**
 
 ## Out of scope (per ticket)
 
@@ -53,9 +54,6 @@ Passed!  - Failed: 0, Passed: 2
 - House drawer / materials redesign (PROP-4)
 - Host API changes
 
-## Recommended next
+## Closed
 
-| Owner | Action |
-| --- | --- |
-| QA-01 / Kurt | Windows Presence: resize edges, maximize, drag both splitters, restart restore |
-| PM-01 | Accept → Pass when Windows smoke is green |
+PM accept: `docs/agents/reports/PROP-12.1-PM01-accept.md`

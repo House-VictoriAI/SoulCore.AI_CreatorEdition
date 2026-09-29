@@ -1,9 +1,9 @@
 ---
 type: proposal
-status: ticketed
+status: done
 tt_id: TT-01
 created: 2026-09-16
-updated: 2026-09-16
+updated: 2026-09-27
 title: "[TINA-main] Presence shell — resize window + adjustable inner panes"
 need: Operator must resize the whole Presence window and drag-adjust chat / Her browser / What she saw panes without a half-finished frameless shell
 sent_at: 2026-09-16
