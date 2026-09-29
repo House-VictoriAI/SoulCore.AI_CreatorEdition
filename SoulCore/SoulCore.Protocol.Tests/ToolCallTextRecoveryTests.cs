@@ -40,4 +40,22 @@ public class ToolCallTextRecoveryTests
             "<execute_tool> list_desktop_windows{} </execute_tool>",
             Tools));
     }
+
+    [Theory]
+    [InlineData("<execute_tool> browser_navigate{url='https://x'} </execute_tool>")]
+    [InlineData("<execute_too> browser_navigate </execute_too>")]
+    [InlineData("<execute_tool> browser_navigate")]
+    [InlineData("<|tool_call>call:browser_navigate{\"url\":\"https://x\"}<tool_call|>")]
+    [InlineData("{\"name\":\"browser_navigate\",\"arguments\":{\"url\":\"https://x\"}}")]
+    public void LooksLikeUnrecoveredToolMarkup_CatchesBrokenAndWellFormedTags(string content)
+    {
+        Assert.True(ToolCallTextRecovery.LooksLikeUnrecoveredToolMarkup(content));
+    }
+
+    [Fact]
+    public void LooksLikeUnrecoveredToolMarkup_IgnoresOrdinaryProse()
+    {
+        Assert.False(ToolCallTextRecovery.LooksLikeUnrecoveredToolMarkup(
+            "Opened Victoria's browser to https://example.com."));
+    }
 }

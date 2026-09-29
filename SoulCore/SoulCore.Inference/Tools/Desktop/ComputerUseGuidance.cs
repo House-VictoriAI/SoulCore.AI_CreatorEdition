@@ -120,8 +120,9 @@ public static class DesktopToolIntent
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static readonly Regex LookAtScreen = new(
-        @"\b(?:look\s+at|see|check|show|capture|screenshot|what(?:'s| is)\s+on)\b[\s\S]{0,40}\b(?:screen|desktop|monitor|display|page|site|website|firefox|browser)\b|" +
+        @"\b(?:look\s+at|see|check|show|capture|screenshot|what(?:'s| is)\s+on)\b[\s\S]{0,40}\b(?:screen|desktop|monitor|display|page|site|website|firefox|browser|playwright|frame)\b|" +
         @"\b(?:screen|desktop|page)\s+(?:shot|capture|screenshot)\b|" +
+        @"\bcapture\s+a\s+frame\b|" +
         @"\btake\s+a\s+screenshot\b|" +
         @"\bscreenshot\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -130,25 +131,46 @@ public static class DesktopToolIntent
         @"\b(?:login|log\s*in|sign\s*in|sign\s*up|register|checkout|password|username|email\s+field|web\s*page|website|web\s*site|in\s+firefox|on\s+the\s+page|click\s+(?:the\s+)?(?:login|sign|submit|button|link)|find\s+(?:the\s+)?(?:login|button|link))\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    /// <summary>
+    /// Named group <c>url</c> so "open https://…" extracts the URL token, not the verb (PROP-13).
+    /// </summary>
     private static readonly Regex NavigateUrl = new(
-        @"\b(?:go\s+to|navigate\s+to|open|visit|browse)\s+(?:https?://|www\.)\S+|\bhttps?://[^\s]+",
+        @"\b(?:go\s+to|navigate\s+to|open|visit|browse)\s+(?<url>(?:https?://|www\.)\S+)|\b(?<url>https?://[^\s]+)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     /// <summary>
     /// Launch / open an allowlisted app — must win over UseComputer→list_windows.
+    /// Includes <c>playwright</c> (Victoria Chromium backend name).
     /// </summary>
     private static readonly Regex OpenApp = new(
-        @"\b(?:open|start|launch|bring\s+up|pull\s+up|fire\s+up|open\s+up)\b[\s\S]{0,48}\b(?:google\s+chrome|chrome|msedge|microsoft\s+edge|edge|firefox|notepad|file\s+explorer|explorer|browser)\b",
+        @"\b(?:open|start|launch|bring\s+up|pull\s+up|fire\s+up|open\s+up)\b[\s\S]{0,48}\b(?:google\s+chrome|chrome|msedge|microsoft\s+edge|edge|firefox|notepad|file\s+explorer|explorer|browser|playwright)\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     /// <summary>
     /// Extra intent beyond bare open/launch — keep the tool-loop so she finishes the ask (BED-180/181).
+    /// Capture/screenshot/frame alone is handled separately for Playwright navigate (PROP-13).
     /// </summary>
     private static readonly Regex OpenAppFollowOnAction = new(
         @"\b(?:click|type|drag|draw|scroll|screenshot|capture|focus|close|hover|move|resize|minimize|maximize|" +
         @"search|find|look\s*up|navigate|browse|check|read|write|fill|select|download|upload|" +
         @"login|sign\s*in|compose|send|reply|play|watch|buy|order|get|fetch|go\s+to|open\s+tab)\b|" +
         @"\b(?:and|then|after\s+that)\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    /// <summary>Capture / frame / show-me asks satisfied by the navigate JPEG publish (PROP-13).</summary>
+    private static readonly Regex CaptureOnlyFollowOn = new(
+        @"\b(?:capture|screenshot|show(?:\s+me)?|frame|snap(?:shot)?)\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    /// <summary>Follow-ons that still need the tool-loop after navigate (not capture-only).</summary>
+    private static readonly Regex NonCaptureFollowOn = new(
+        @"\b(?:click|type|drag|draw|scroll|focus|close|hover|move|resize|minimize|maximize|" +
+        @"search|find|look\s*up|fill|select|download|upload|login|sign\s*in|compose|send|" +
+        @"reply|play|watch|buy|order|write|read)\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly Regex MentionsPlaywright = new(
+        @"\bplaywright\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static readonly Regex LaunchUrl = new(
@@ -241,7 +263,7 @@ public static class DesktopToolIntent
 
         // OpenApp BEFORE LookAtScreen / UseComputer so "open Chrome on my desktop"
         // does not fall through to list_desktop_windows.
-        // With Playwright: browser/Chrome/Edge/website opens → browser_navigate
+        // With Playwright: browser/Chrome/Edge/website/playwright opens → browser_navigate
         // (not VirtualBox desktop_open_app). Explicit guest/VM asks stay on open_app.
         if (OpenApp.IsMatch(text))
         {
@@ -255,6 +277,16 @@ public static class DesktopToolIntent
             return true;
         }
 
+        // PROP-13: "playwright … capture a frame" with no open-verb still means her browser.
+        if (preferPlaywright
+            && MentionsPlaywright.IsMatch(text)
+            && !WantsGuestBrowser.IsMatch(text)
+            && (CaptureOnlyFollowOn.IsMatch(text) || NavigateUrl.IsMatch(text)))
+        {
+            match = new Match(Kind.BrowserNavigate, "browser_navigate");
+            return true;
+        }
+
         // Standalone URL → browser_navigate.
         if (NavigateUrl.IsMatch(text))
         {
@@ -264,6 +296,25 @@ public static class DesktopToolIntent
 
         if (LookAtScreen.IsMatch(text))
         {
+            // PROP-13: frame / playwright capture → browser pane, not desktop_screenshot.
+            if (preferPlaywright
+                && (MentionsPlaywright.IsMatch(text)
+                    || Regex.IsMatch(text, @"\bframe\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+                    || ShouldUsePlaywrightBrowser(text)))
+            {
+                var lowerLook = text.ToLowerInvariant();
+                if (lowerLook.Contains("screen", StringComparison.Ordinal)
+                    || lowerLook.Contains("desktop", StringComparison.Ordinal)
+                    || lowerLook.Contains("monitor", StringComparison.Ordinal))
+                {
+                    match = new Match(Kind.Screenshot, "desktop_screenshot");
+                    return true;
+                }
+
+                match = new Match(Kind.BrowserNavigate, "browser_navigate");
+                return true;
+            }
+
             match = new Match(Kind.Screenshot, "desktop_screenshot");
             return true;
         }
@@ -325,18 +376,41 @@ public static class DesktopToolIntent
     /// <summary>
     /// True when the user only asked to open/launch (optional URL) — no click/type/etc.
     /// Host can Process.Start and reply without further LLM rounds (BED-180).
+    /// PROP-13: capture/frame/screenshot-only follow-on on a browser_navigate ask is also
+    /// "pure" — the navigate JPEG publish is the frame.
     /// </summary>
-    public static bool IsPureOpenPrompt(string? userText)
+    public static bool IsPureOpenPrompt(string? userText) =>
+        IsPureOpenPrompt(userText, browserBackend: null);
+
+    /// <inheritdoc cref="IsPureOpenPrompt(string?)"/>
+    public static bool IsPureOpenPrompt(string? userText, string? browserBackend)
     {
         if (string.IsNullOrWhiteSpace(userText))
             return false;
-        // Prefer Playwright-aware match so "open chrome" counts as BrowserNavigate when configured.
-        // Without backend, still treat OpenApp / BrowserNavigate-shaped opens as pure when no follow-on.
-        if (!TryMatch(userText, out var match))
+        // Prefer Playwright-aware match so "open chrome" / "open playwright" count as
+        // BrowserNavigate when configured.
+        if (!TryMatch(userText, browserBackend, out var match))
             return false;
         if (match.Intent is not (Kind.OpenApp or Kind.BrowserNavigate))
             return false;
+        if (match.Intent == Kind.BrowserNavigate && IsCaptureOnlyBrowserAsk(userText))
+            return true;
         return !OpenAppFollowOnAction.IsMatch(userText);
+    }
+
+    /// <summary>
+    /// Capture / frame / show-me follow-on with no click/type/fill — navigate publish is enough (PROP-13).
+    /// </summary>
+    public static bool IsCaptureOnlyBrowserAsk(string? userText)
+    {
+        if (string.IsNullOrWhiteSpace(userText))
+            return false;
+        if (NonCaptureFollowOn.IsMatch(userText))
+            return false;
+        // Bare open with no follow-on is also fine for early-exit.
+        if (!OpenAppFollowOnAction.IsMatch(userText))
+            return true;
+        return CaptureOnlyFollowOn.IsMatch(userText);
     }
 
     /// <summary>True when Tools:BrowserBackend is playwright (Victoria Chromium).</summary>
@@ -358,7 +432,7 @@ public static class DesktopToolIntent
         var alias = ResolveOpenAppAlias(text);
         if (alias is "notepad" or "explorer" or "cmd" or "powershell")
             return false;
-        if (alias is "chrome" or "edge" or "msedge" or "firefox")
+        if (alias is "chrome" or "edge" or "msedge" or "firefox" or "playwright")
             return true;
 
         if (WantsGuestBrowser.IsMatch(text))
@@ -370,13 +444,19 @@ public static class DesktopToolIntent
                || lower.Contains("web site", StringComparison.Ordinal)
                || lower.Contains("firefox", StringComparison.Ordinal)
                || lower.Contains("chrome", StringComparison.Ordinal)
+               || lower.Contains("playwright", StringComparison.Ordinal)
                || TryExtractNavigateUrl(text, out _);
     }
 
     /// <summary>
-    /// Default URL for a pure "open the browser" ask under Playwright (no host given).
+    /// Legacy default when a blank page was allowed. PROP-13: do not soft-dispatch this
+    /// when the user named a site or asked to open/capture without a URL — ask instead.
     /// </summary>
     public const string DefaultPlaywrightOpenUrl = "about:blank";
+
+    /// <summary>One-sentence ask when browser_navigate has no http(s) URL (PROP-13).</summary>
+    public const string MissingNavigateUrlReply =
+        "I need a full http:// or https:// URL to open in Victoria's browser.";
 
     public static string BuildOpenedBrowserReply(string? url)
     {
@@ -429,8 +509,9 @@ public static class DesktopToolIntent
         var m = NavigateUrl.Match(userText.Trim());
         if (!m.Success)
             return false;
-        var raw = m.Groups.Count > 1 && m.Groups[1].Success && !string.IsNullOrWhiteSpace(m.Groups[1].Value)
-            ? m.Groups[1].Value
+        // Prefer named group so "open https://…" does not keep the verb (PROP-13).
+        var raw = m.Groups["url"].Success && !string.IsNullOrWhiteSpace(m.Groups["url"].Value)
+            ? m.Groups["url"].Value
             : m.Value;
         raw = raw.Trim().TrimEnd('.', ',', ';', ')', ']');
         if (raw.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
@@ -463,6 +544,8 @@ public static class DesktopToolIntent
     private static string ResolveOpenAppAlias(string text)
     {
         var lower = text.ToLowerInvariant();
+        if (lower.Contains("playwright", StringComparison.Ordinal))
+            return "playwright";
         if (lower.Contains("firefox", StringComparison.Ordinal))
             return "firefox";
         if (lower.Contains("msedge", StringComparison.Ordinal)

@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Playwright;
@@ -147,6 +149,15 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
             return new BrowserBridgeResult(false, "browser_navigate needs an http(s) URL.", null);
+        }
+
+        // PROP-13.3: refuse loopback / link-local / private / cloud-metadata hosts.
+        if (await IsDisallowedNavigateHostAsync(uri, ct).ConfigureAwait(false))
+        {
+            return new BrowserBridgeResult(
+                false,
+                "browser_navigate refused: private, loopback, or metadata host.",
+                null);
         }
 
         try
@@ -473,6 +484,13 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
     {
         if (_view is null)
             return;
+        // PROP-13.3: honor AllowBrowserCapture before any hub JPEG publish.
+        if (!BrowserToolGate.IsCaptureAllowed(_opts.Value))
+        {
+            _log?.LogDebug("Playwright frame publish skipped — AllowBrowserCapture=false ({Action})", action);
+            return;
+        }
+
         try
         {
             var bytes = await page.ScreenshotAsync(new PageScreenshotOptions { Type = ScreenshotType.Jpeg, Quality = 55 })
@@ -486,6 +504,92 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
         {
             _log?.LogDebug(ex, "Playwright frame publish failed");
         }
+    }
+
+    /// <summary>
+    /// PROP-13.3: reject loopback, link-local, private RFC1918, and cloud-metadata hosts.
+    /// </summary>
+    public static async Task<bool> IsDisallowedNavigateHostAsync(Uri uri, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        var host = (uri.DnsSafeHost ?? uri.Host ?? "").Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(host))
+            return true;
+        if (host is "localhost" or "metadata" or "metadata.google.internal"
+            or "metadata.goog" or "instance-data")
+            return true;
+
+        if (IPAddress.TryParse(host, out var literal))
+            return IsPrivateOrLocalAddress(literal);
+
+        try
+        {
+            var addrs = await Dns.GetHostAddressesAsync(host, ct).ConfigureAwait(false);
+            foreach (var addr in addrs)
+            {
+                if (IsPrivateOrLocalAddress(addr))
+                    return true;
+            }
+        }
+        catch (Exception)
+        {
+            // DNS failure is not by itself a private-host hit; Navigate will surface load errors.
+        }
+
+        return false;
+    }
+
+    /// <summary>Sync helper for unit tests (IP literals + known hostnames only).</summary>
+    public static bool IsDisallowedNavigateHost(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return true;
+        var host = (uri.DnsSafeHost ?? uri.Host ?? "").Trim().ToLowerInvariant();
+        if (host is "localhost" or "metadata" or "metadata.google.internal"
+            or "metadata.goog" or "instance-data")
+            return true;
+        if (IPAddress.TryParse(host, out var literal))
+            return IsPrivateOrLocalAddress(literal);
+        return false;
+    }
+
+    private static bool IsPrivateOrLocalAddress(IPAddress address)
+    {
+        if (IPAddress.IsLoopback(address))
+            return true;
+        if (address.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            if (address.IsIPv6LinkLocal || address.IsIPv6SiteLocal || address.IsIPv6UniqueLocal)
+                return true;
+            // IPv4-mapped
+            if (address.IsIPv4MappedToIPv6)
+                return IsPrivateOrLocalAddress(address.MapToIPv4());
+            return false;
+        }
+
+        if (address.AddressFamily != AddressFamily.InterNetwork)
+            return true;
+
+        var bytes = address.GetAddressBytes();
+        // 10.0.0.0/8
+        if (bytes[0] == 10)
+            return true;
+        // 172.16.0.0/12
+        if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
+            return true;
+        // 192.168.0.0/16
+        if (bytes[0] == 192 && bytes[1] == 168)
+            return true;
+        // 169.254.0.0/16 link-local (incl. cloud metadata 169.254.169.254)
+        if (bytes[0] == 169 && bytes[1] == 254)
+            return true;
+        // 127.0.0.0/8 already covered by IsLoopback for 127.0.0.1; cover rest
+        if (bytes[0] == 127)
+            return true;
+        // 0.0.0.0
+        if (bytes[0] == 0)
+            return true;
+        return false;
     }
 
     private async Task EnsureClickCursorAsync(IPage page)

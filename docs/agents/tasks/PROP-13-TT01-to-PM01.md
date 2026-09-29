@@ -4,9 +4,11 @@ prop_id: PROP-13-playwright-frame-not-leaked-text
 from: TT-01
 to: PM-01
 mode: idea
-status: sent-to-pm
+status: Ticketed — PROP-13.1–13.3 BED
 created: 2026-09-29
+updated: 2026-09-29
 proposal: docs/agents/unexecuted_proposals/playwright-open-and-frame-not-leaked-tool-text.md
+pm_tickets: docs/agents/tasks/PROP-13.1-PM01-to-BED01.md, docs/agents/tasks/PROP-13.2-PM01-to-BED01.md, docs/agents/tasks/PROP-13.3-PM01-to-BED01.md
 ---
 
 # PROP-13 — Playwright open-and-frame must run, not echo tool markup

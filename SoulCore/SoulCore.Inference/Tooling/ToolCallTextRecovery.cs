@@ -53,6 +53,38 @@ public static class ToolCallTextRecovery
                || TryRecoverJson(content, toolNames, out _);
     }
 
+    /// <summary>
+    /// Broader than <see cref="LooksLikeToolLeak"/> — catches truncated/unclosed tags
+    /// and Gemma tokens that recovery cannot parse (PROP-13.2 reply firewall).
+    /// Does not require a tool-name allowlist hit.
+    /// </summary>
+    public static bool LooksLikeUnrecoveredToolMarkup(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return false;
+        if (ExecuteToolTag.IsMatch(content) || GemmaToolCall.IsMatch(content))
+            return true;
+        // Truncated / misspelled / unclosed execute_tool variants (e.g. &lt;execute_too&gt;).
+        if (Regex.IsMatch(
+                content,
+                @"</?execute_too\w*|</?\|?tool_call|call:\s*[A-Za-z0-9_]+\s*\{",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+        {
+            return true;
+        }
+
+        // Bare tool-call JSON occupying most of the reply.
+        var trimmed = content.Trim();
+        if (trimmed.StartsWith('{')
+            && trimmed.Contains("\"name\"", StringComparison.Ordinal)
+            && trimmed.Contains("\"arguments\"", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     private static void TryAddMatch(
         string name,
         string argsText,

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using SoulCore.Config;
 using SoulCore.Inference.Clients;
 using SoulCore.Inference.Tooling;
+using SoulCore.Inference.Tools.Desktop;
 
 namespace SoulCore.Protocol.Tests;
 
@@ -1223,6 +1224,85 @@ public class OllamaToolLoopTests
         Assert.Equal("list_desktop_windows", registry.Calls[0].Name);
     }
 
+    [Fact]
+    public async Task Prop13_BrowserNavigate_MissingUrl_AsksWithoutModelOrAboutBlank()
+    {
+        var handler = new ScriptedHandler(Array.Empty<string>());
+        var registry = new ScriptedRegistry(
+            ("browser_navigate", _ => new ToolResult(true, "should not run", null)));
+        var client = MakeClient(handler, registry: registry);
+
+        var result = await client.CompleteWithToolsAsync(
+            new List<ChatMessage>
+            {
+                new() { Role = "user", Content = "open your playwright and capture a frame" }
+            },
+            new[] { BrowserNavigateToolDef() },
+            registry,
+            loopOptions: new ToolLoopOptions { ForceToolName = "browser_navigate" });
+
+        Assert.Equal(DesktopToolIntent.MissingNavigateUrlReply, result);
+        Assert.Equal(0, handler.CallCount);
+        Assert.Empty(registry.Calls);
+    }
+
+    [Fact]
+    public async Task Prop13_BrowserNavigate_CaptureOnly_PredispatchesAndEarlyExits()
+    {
+        var handler = new ScriptedHandler(Array.Empty<string>());
+        var registry = new ScriptedRegistry(
+            ("browser_navigate", args =>
+            {
+                Assert.Equal("https://example.com", args.GetProperty("url").GetString());
+                return new ToolResult(true, "playwright loaded https://example.com", null);
+            }));
+        var client = MakeClient(handler, registry: registry);
+
+        var result = await client.CompleteWithToolsAsync(
+            new List<ChatMessage>
+            {
+                new()
+                {
+                    Role = "user",
+                    Content = "open your playwright to https://example.com and capture a frame"
+                }
+            },
+            new[] { BrowserNavigateToolDef() },
+            registry,
+            loopOptions: new ToolLoopOptions { ForceToolName = "browser_navigate" });
+
+        Assert.Equal(0, handler.CallCount);
+        Assert.Single(registry.Calls);
+        Assert.Equal("browser_navigate", registry.Calls[0].Name);
+        Assert.Contains("https://example.com", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("execute_tool", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("about:blank", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Prop13_ReplyFirewall_StripsUnrecoveredExecuteToolTag()
+    {
+        var handler = new ScriptedHandler(
+            new[]
+            {
+                ChatResponseJson(
+                    content: "<execute_too> browser_navigate{url='https://x'} </execute_too>",
+                    toolCalls: null)
+            });
+        var registry = new ScriptedRegistry(
+            ("browser_navigate", _ => new ToolResult(true, "nav", null)));
+        var client = MakeClient(handler, registry: registry);
+
+        var result = await client.CompleteWithToolsAsync(
+            new List<ChatMessage> { new() { Role = "user", Content = "hello" } },
+            new[] { BrowserNavigateToolDef() },
+            registry);
+
+        Assert.DoesNotContain("execute_too", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("browser_navigate", result, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(registry.Calls);
+    }
+
     private static ToolDefinition ListDesktopWindowsToolDef() => new(
         "list_desktop_windows",
         "List visible desktop windows.",
@@ -1231,8 +1311,8 @@ public class OllamaToolLoopTests
     [Fact]
     public async Task FallbackParser_NameNotRegistered_TreatedAsTextReply()
     {
-        // The leaked JSON has a name that is NOT a registered tool → treat as
-        // a normal text reply (no dispatch, no crash).
+        // The leaked JSON has a name that is NOT a registered tool → no dispatch.
+        // PROP-13.2: reply firewall strips tool-shaped markup instead of echoing it.
         var handler = new ScriptedHandler(
             new[]
             {
@@ -1252,8 +1332,8 @@ public class OllamaToolLoopTests
         var result = await client.CompleteWithToolsAsync(
             messages, new[] { EchoToolDef() }, registry);
 
-        // Treated as a text reply — the leaked JSON is returned verbatim, no dispatch.
-        Assert.Contains("not_a_tool", result);
+        Assert.DoesNotContain("not_a_tool", result);
+        Assert.DoesNotContain("\"arguments\"", result);
         Assert.Equal(1, handler.CallCount);
         Assert.Empty(registry.Calls);
     }
@@ -1261,8 +1341,8 @@ public class OllamaToolLoopTests
     [Fact]
     public async Task FallbackParser_NoToolsAdvertised_DoesNotAttemptRecovery()
     {
-        // When no tools are advertised, content-embedded JSON is never a tool
-        // call — the loop must return the text in 1 round-trip.
+        // When no tools are advertised, content-embedded JSON is never dispatched.
+        // PROP-13.2: still strip tool-shaped markup from the bubble.
         var handler = new ScriptedHandler(
             new[]
             {
@@ -1281,7 +1361,8 @@ public class OllamaToolLoopTests
         var result = await client.CompleteWithToolsAsync(
             messages, Array.Empty<ToolDefinition>(), registry);
 
-        Assert.Contains("echo", result);
+        Assert.DoesNotContain("\"arguments\"", result);
+        Assert.DoesNotContain("execute_tool", result, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, handler.CallCount);
         Assert.Empty(registry.Calls);
     }

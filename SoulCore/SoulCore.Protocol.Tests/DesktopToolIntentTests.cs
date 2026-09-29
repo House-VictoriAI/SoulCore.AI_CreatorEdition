@@ -234,6 +234,9 @@ public class DesktopToolIntentTests
     [InlineData("start notepad", "desktop_open_app")]
     [InlineData("open firefox in the vm", "browser_navigate")]
     [InlineData("open chrome in virtualbox", "browser_navigate")]
+    [InlineData("open your playwright and capture a frame", "browser_navigate")]
+    [InlineData("open playwright to https://example.com", "browser_navigate")]
+    [InlineData("capture a frame of the playwright browser", "browser_navigate")]
     public void TryMatch_PlaywrightBackend_RoutesBrowserToNavigate(string text, string expectedTool)
     {
         Assert.True(DesktopToolIntent.TryMatch(text, "playwright", out var match));
@@ -246,6 +249,49 @@ public class DesktopToolIntentTests
         Assert.True(DesktopToolIntent.TryMatch("open Google Chrome", "playwright", out var match));
         Assert.Equal(DesktopToolIntent.Kind.BrowserNavigate, match.Intent);
         Assert.Equal("browser_navigate", match.ToolName);
+    }
+
+    // ---------------------------------------------------------------------
+    // PROP-13: URL extract + capture-only pure open + missing-URL ask
+    // ---------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("open https://example.com", "https://example.com")]
+    [InlineData("visit https://example.com/path", "https://example.com/path")]
+    [InlineData("go to https://example.com", "https://example.com")]
+    [InlineData("https://example.com alone", "https://example.com")]
+    [InlineData("open www.example.com", "https://www.example.com")]
+    public void TryExtractNavigateUrl_DoesNotSwallowVerb(string text, string expected)
+    {
+        Assert.True(DesktopToolIntent.TryExtractNavigateUrl(text, out var url));
+        Assert.Equal(expected, url);
+    }
+
+    [Theory]
+    [InlineData("open your playwright and capture a frame", true)]
+    [InlineData("open playwright to https://example.com and capture a frame", true)]
+    [InlineData("open chrome and take a screenshot", true)]
+    [InlineData("open chrome and click the login button", false)]
+    [InlineData("open chrome then type hello", false)]
+    public void IsCaptureOnlyBrowserAsk_ClassifiesFollowOns(string text, bool expected)
+    {
+        Assert.Equal(expected, DesktopToolIntent.IsCaptureOnlyBrowserAsk(text));
+    }
+
+    [Theory]
+    [InlineData("open playwright to https://example.com and capture a frame", true)]
+    [InlineData("open your playwright and capture a frame of https://example.com", true)]
+    [InlineData("open chrome and click Login", false)]
+    public void IsPureOpenPrompt_Playwright_CaptureOnlyIsPure(string text, bool expected)
+    {
+        Assert.Equal(expected, DesktopToolIntent.IsPureOpenPrompt(text, "playwright"));
+    }
+
+    [Fact]
+    public void MissingNavigateUrlReply_IsPlainLanguage()
+    {
+        Assert.Contains("http", DesktopToolIntent.MissingNavigateUrlReply, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("execute_tool", DesktopToolIntent.MissingNavigateUrlReply, StringComparison.OrdinalIgnoreCase);
     }
 
 }
