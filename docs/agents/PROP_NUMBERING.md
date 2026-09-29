@@ -42,7 +42,7 @@ Reconciled against `main` on **2026-09-15**; re-verified **2026-09-27** (see
 | PROP-1-digits-sms-channel | Tablet SMS/MMS Avenue B (MDN = SM-X218U; DIGITS dropped). Temp: Tasker/Termux; goal: self-sufficient House gateway. | **1.1–1.4 landed** (1.4 Partial) → **1.5 / 1.6 open** | 1.1–1.6 |
 | PROP-2-ue-reliable-embodiment | UE Kayleigh 1P / Victoria walk / one eye | **Open** — human-gated on shadow PIE; 2.1–2.3 Pending, 2.4 Held | 2.1–2.4 |
 | PROP-3-link-messenger-product | Link Messenger-class rewrite | **Open** — parked on SMS QA, but Wave 1 items 1–2 landed via PR #99; visual overhaul still gated on Q1 | — |
-| PROP-4-presence-shell-honest-hud | Presence House drawer + installer | **Open** — 4.1 **Partial** (branch slice unlanded + Windows visual QA), 4.2 Pending | 4.1 FED · 4.2 OPS |
+| PROP-4-presence-shell-honest-hud | Presence House drawer + installer | **Open** — 4.1 Partial (Windows QA); **4.2 Partial** (Velopack + Update button; Windows Setup smoke pending) | 4.1 FED · 4.2 OPS |
 | PROP-5-host-sqlite-concurrency-ownership | Host SQLite concurrency + charter ownership + SoulLoop single-flight | **Pass** — 5.1–5.4 Accepted 2026-09-05 (`cursor/prop5-sqlite-gate-8a1f`); on `main` | 5.1–5.4 |
 | PROP-6-desktop-drag-async-delay | Desktop drag Thread.Sleep → async delay | **Pass** — 6.1 Accepted 2026-09-05 (`cursor/prop6-desktop-delay-8a1f`); on `main` | 6.1 |
 | PROP-7-hermes-dead-surface-cleanup | Remove live Hermes contracts/config/DI + docs honesty | **Pass** — 7.1 Accepted 2026-09-05 (`cursor/prop7-hermes-cleanup-8a1f`); on `main` | — (report-only) |
@@ -73,7 +73,7 @@ Next free `N`: **13**.
 | **PROP-2.1–2.3** | REX-01 | Shadow PIE Kayleigh 1P possess, travel-cm/loco AnimBP, one Presence eye still. Human-gated (needs the Shadow PC) |
 | **PROP-2.4** | REX-01 | Held until PROP-2.1 Pass |
 | **PROP-4.1** | FED-01 | **Partial.** Code half is now PR #98 (cherry-picked onto `main`). Only Windows visual QA is left. ⚠️ **Do not merge `cursor/prop4-presence-drawer-8a1f`** — it is branched from before PROP-7…11 and would delete `Hosting/ServiceCollectionExtensions/*`, `Ws/ChatSendHandler.cs`, `Ws/ChatContextBuilder.cs`, `Ws/ChatPostEffectsHandler.cs` and re-inflate `Program.cs`. The three items were taken off it by path; delete the branch |
-| **PROP-4.2** | OPS-01 | Presence installer + Start shortcut + Velopack update toast — not started |
+| **PROP-4.2** | OPS-01 | **Partial** on `cursor/prop42-presence-installer-9531` — Update button + pack script; needs Windows Setup.exe + published feed smoke |
 | **PROP-3** | — | Parked until SMS QA Pass |
 
 Legacy non-PROP tickets still Pending: `TASK-123`, `TASK-137`, `TASK-139` (QA gates),

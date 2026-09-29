@@ -100,6 +100,7 @@ public partial class MainWindow : Window
         EndpointText.Text = ConnectionDefaults.DisplayEndpoint;
         DisplayNameBox.Text = _uiSettings.DisplayName;
         InitLayoutChrome();
+        InitPresenceUpdates();
 
         _okBrush = Res("OkBrush");
         _warnBrush = Res("WarnBrush");
