@@ -64,6 +64,8 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,12,0">
               <Button x:Name="NavSettings" Classes="frame-nav" Content="SETTINGS"
                       Click="NavSettings_Click"/>
+              <Button x:Name="NavUpdate" Classes="chrome" Content="Update" FontSize="11" Padding="10,6"
+                      Click="UpdateCheck_Click" ToolTip.Tip="Check for Presence updates"/>
               <Button Classes="chrome" Content="Correct mood…" FontSize="11" Padding="10,6"
                       Click="CorrectEmotion_Click"/>
               <Button Classes="chrome" Content="Refresh" Click="Refresh_Click"/>
@@ -83,6 +85,19 @@
                       ToolTip.Tip="Close"/>
             </StackPanel>
           </Grid>
+        </Border>
+
+        <!-- PROP-4.2: update toast (auto-check + manual Update) -->
+        <Border x:Name="UpdateToastBar" DockPanel.Dock="Top" IsVisible="False"
+                Classes="carbon glass" Padding="12,8" Margin="12,0,12,8">
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Classes="ghost" Content="Dismiss" Margin="8,0,0,0"
+                    Click="UpdateToastDismiss_Click"/>
+            <Button x:Name="UpdateToastActionButton" DockPanel.Dock="Right" Classes="primary"
+                    Content="Update" Margin="8,0,0,0" Click="UpdateApply_Click"/>
+            <TextBlock x:Name="UpdateToastText" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Text="Update available"/>
+          </DockPanel>
         </Border>
 
         <!-- Correct-mood panel (shared, overlays under strip) -->
@@ -698,6 +713,31 @@
                 <TextBlock x:Name="NotifStatusText" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center"/>
               </StackPanel>
             </StackPanel>
+          </TabItem>
+
+          <TabItem Header="Updates">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <StackPanel Margin="12" Spacing="6">
+                <TextBlock Text="Updates" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" FontSize="12"
+                           Text="Presence installs like a normal Windows app (Setup.exe). Check here for updates, or use the Update button when a toast appears."
+                           Margin="0,0,0,12"/>
+                <TextBlock Text="Installed version" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"/>
+                <TextBox x:Name="UpdateVersionBox" Classes="input" IsReadOnly="True" Text="—"
+                         Padding="8" Margin="0,0,0,8"/>
+                <TextBlock Text="Update feed" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"/>
+                <TextBox x:Name="UpdateFeedBox" Classes="input" IsReadOnly="True" Text="—"
+                         TextWrapping="Wrap" Padding="8" Margin="0,0,0,12"/>
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                  <Button x:Name="UpdateCheckButton" Classes="primary" Content="Check for updates"
+                          Click="UpdateCheck_Click"/>
+                  <Button x:Name="UpdateApplyButton" Classes="ghost" Content="Download &amp; restart"
+                          IsEnabled="False" Click="UpdateApply_Click"/>
+                </StackPanel>
+                <TextBlock x:Name="UpdateStatusText" TextWrapping="Wrap"
+                           Foreground="{DynamicResource MutedBrush}" Text=""/>
+              </StackPanel>
+            </ScrollViewer>
           </TabItem>
         </TabControl>
         </Grid>

@@ -40,6 +40,12 @@ public sealed class LocalUiSettings
     /// <summary>Sight panel row height inside the right column.</summary>
     public double? SightRowHeight { get; set; }
 
+    /// <summary>
+    /// PROP-4.2 optional update feed override (GitHub repo URL or HTTP/file path).
+    /// Empty → GitHub Releases for Linearthrone/SoulCore.AI.
+    /// </summary>
+    public string? UpdateFeedUrl { get; set; }
+
     public static string StorePath =>
         Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
