@@ -204,21 +204,22 @@ public sealed class ChatContextBuilder : IChatContextBuilder
 
     private static string BuildIdentityBlock(IReadOnlyList<string> identityAnchors)
     {
-        if (identityAnchors is null || identityAnchors.Count == 0)
-            return string.Empty;
-
         var sb = new StringBuilder(512);
         sb.Append("[Identity]\n");
-        var first = true;
-        foreach (var anchor in identityAnchors)
+        // Standing address rule (Agents/AGENTS.md): Victoria-facing name for the human is Kayleigh.
+        sb.Append(
+            "The human you are with is Kayleigh. Address them as Kayleigh only; " +
+            "if memory or history uses any other personal name for them, ignore it.");
+        if (identityAnchors is { Count: > 0 })
         {
-            if (string.IsNullOrWhiteSpace(anchor))
-                continue;
-            if (!first)
-                sb.Append('\n');
-            sb.Append(anchor.Trim());
-            first = false;
+            foreach (var anchor in identityAnchors)
+            {
+                if (string.IsNullOrWhiteSpace(anchor))
+                    continue;
+                sb.Append('\n').Append(anchor.Trim());
+            }
         }
+
         sb.Append("\n\n");
         return sb.ToString();
     }

@@ -98,6 +98,16 @@ public class SmsInboundServiceTests
         Assert.Contains("Do not call tools", p, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("desktop_open_app", p, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("[Memory]", p);
+        Assert.Contains("Kayleigh", p, StringComparison.Ordinal);
+        Assert.Contains("same person as on Presence", p, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildSmsPreamble_LocksKayleighAddressEvenIfMemorySilent()
+    {
+        var p = SmsInboundService.BuildSmsPreamble(Array.Empty<string>());
+        Assert.Contains("Address her only as Kayleigh", p, StringComparison.Ordinal);
+        Assert.Contains("do not become a generic assistant", p, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
