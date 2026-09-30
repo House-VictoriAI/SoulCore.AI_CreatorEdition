@@ -30,6 +30,7 @@ public sealed class ChatContextBuilder : IChatContextBuilder
     private readonly IEmbeddingClient _embeddings;
     private readonly ICharter _charter;
     private readonly IEmotionState _emotion;
+    private readonly IToolsAccessSettings _toolsAccess;
     private readonly ILogger<ChatContextBuilder> _logger;
 
     public ChatContextBuilder(
@@ -37,12 +38,14 @@ public sealed class ChatContextBuilder : IChatContextBuilder
         IEmbeddingClient embeddings,
         ICharter charter,
         IEmotionState emotion,
+        IToolsAccessSettings toolsAccess,
         ILogger<ChatContextBuilder> logger)
     {
         _memory = memory ?? throw new ArgumentNullException(nameof(memory));
         _embeddings = embeddings ?? throw new ArgumentNullException(nameof(embeddings));
         _charter = charter ?? throw new ArgumentNullException(nameof(charter));
         _emotion = emotion ?? throw new ArgumentNullException(nameof(emotion));
+        _toolsAccess = toolsAccess ?? throw new ArgumentNullException(nameof(toolsAccess));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -78,7 +81,10 @@ public sealed class ChatContextBuilder : IChatContextBuilder
         if (useToolLoop)
         {
             preamble = ToolAgencyGuidance.AppendToPreamble(preamble);
-            preamble = ComputerUseGuidance.AppendToPreamble(preamble, desktopTargetWindowTitle);
+            preamble = ComputerUseGuidance.AppendToPreamble(
+                preamble,
+                desktopTargetWindowTitle,
+                _toolsAccess.BrowserBackend);
             preamble = HomeBodyGuidance.AppendToPreamble(preamble);
             preamble = ChiefArchitectGuidance.AppendToPreamble(preamble);
             preamble = EmailGuidance.AppendToPreamble(preamble);

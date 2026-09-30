@@ -85,6 +85,7 @@ public class ChatWebSocketHandlerToolLoopTests
             embeddings,
             charter,
             emotion,
+            tools,
             loggerFactory.CreateLogger<ChatContextBuilder>());
 
         var emotionSnapshot = new EmotionSnapshotSender(

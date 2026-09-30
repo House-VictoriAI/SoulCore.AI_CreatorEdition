@@ -15,11 +15,11 @@ public sealed class DesktopOpenAppTool : ITool
           "properties": {
             "app": {
               "type": "string",
-              "description": "Non-browser app alias only: notepad, explorer, cmd, powershell. Never chrome, edge, or firefox — websites use browser_navigate."
+              "description": "App alias: notepad, explorer, cmd, powershell; or firefox/chrome/edge to open the guest browser when VM-scoped (not Playwright)."
             },
             "args": {
               "type": "string",
-              "description": "Optional arguments for the desktop app. Not a website URL."
+              "description": "Optional arguments (e.g. URL for guest Firefox)."
             }
           },
           "required": ["app"]
@@ -54,9 +54,9 @@ public sealed class DesktopOpenAppTool : ITool
     public ToolDefinition Definition { get; } = new(
         Name: "desktop_open_app",
         Description:
-            "Launch a non-browser desktop app (notepad, explorer, cmd, powershell) inside the Ubuntu guest when desktop scope is on. " +
-            "NEVER use this for websites, Chrome, Edge, Firefox, or 'open the browser' — those are browser_navigate on Victoria's Playwright Chromium, not VirtualBox. " +
-            "Requires AllowComputerControl.",
+            "Launch an allowlisted app. When DesktopTargetWindowTitle scopes to victoria-sandbox and BrowserBackend is not playwright, " +
+            "chrome/edge/firefox open guest Firefox inside the VM (pass URL in args). Otherwise non-browser aliases only " +
+            "(notepad, explorer, cmd, powershell). Requires AllowComputerControl.",
         Parameters: ParametersSchema);
 
     public async Task<ToolResult> ExecuteAsync(JsonElement args, CancellationToken ct = default)

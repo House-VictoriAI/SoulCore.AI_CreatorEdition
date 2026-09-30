@@ -131,12 +131,12 @@ public class DesktopToolIntentTests
     }
 
     [Fact]
-    public void ComputerUseGuidance_ScopedBlock_LocksVmTitle()
+    public void ComputerUseGuidance_ScopedBlock_LocksVmTitle_PlaywrightMode()
     {
-        var once = ComputerUseGuidance.AppendToPreamble("hello", "victoria-sandbox");
+        var once = ComputerUseGuidance.AppendToPreamble("hello", "victoria-sandbox", "playwright");
         Assert.Contains(ComputerUseGuidance.Marker, once, StringComparison.Ordinal);
         Assert.Contains(ComputerUseGuidance.Block, once, StringComparison.Ordinal);
-        Assert.Contains(ComputerUseGuidance.ScopedBlock("victoria-sandbox"), once, StringComparison.Ordinal);
+        Assert.Contains(ComputerUseGuidance.ScopedBlock("victoria-sandbox", "playwright"), once, StringComparison.Ordinal);
         Assert.Contains("Preferred workflow", once, StringComparison.Ordinal);
         Assert.Contains("DESKTOP SCOPE", once, StringComparison.Ordinal);
         Assert.Contains("victoria-sandbox", once, StringComparison.Ordinal);
@@ -146,11 +146,22 @@ public class DesktopToolIntentTests
         Assert.Contains("hard error", once, StringComparison.Ordinal);
         Assert.Contains("Do NOT mention VirtualBox", ComputerUseGuidance.Block, StringComparison.Ordinal);
         Assert.Contains("Do not tell Kayleigh to start VirtualBox", once, StringComparison.Ordinal);
-        // Full playbook stays; scoped text is appended after it.
         Assert.True(
             once.IndexOf(ComputerUseGuidance.Block, StringComparison.Ordinal)
             < once.IndexOf("DESKTOP SCOPE", StringComparison.Ordinal));
-        Assert.Equal(once, ComputerUseGuidance.AppendToPreamble(once, "victoria-sandbox"));
+        Assert.Equal(once, ComputerUseGuidance.AppendToPreamble(once, "victoria-sandbox", "playwright"));
+    }
+
+    [Fact]
+    public void ComputerUseGuidance_ScopedBlock_VmPrimary_WhenNotPlaywright()
+    {
+        var once = ComputerUseGuidance.AppendToPreamble("hello", "victoria-sandbox", "native");
+        Assert.Contains(ComputerUseGuidance.VmBlock, once, StringComparison.Ordinal);
+        Assert.Contains("VM PRIMARY", once, StringComparison.Ordinal);
+        Assert.Contains("victoria-sandbox", once, StringComparison.Ordinal);
+        Assert.Contains("desktop_open_app firefox", once, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("WEB IS NOT THE VM", once, StringComparison.Ordinal);
+        Assert.Contains(ComputerUseGuidance.BlockFor("native"), once, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -249,6 +260,18 @@ public class DesktopToolIntentTests
         Assert.True(DesktopToolIntent.TryMatch("open Google Chrome", "playwright", out var match));
         Assert.Equal(DesktopToolIntent.Kind.BrowserNavigate, match.Intent);
         Assert.Equal("browser_navigate", match.ToolName);
+    }
+
+    [Theory]
+    [InlineData("open Google Chrome", "desktop_open_app")]
+    [InlineData("open the browser", "desktop_open_app")]
+    [InlineData("open chrome to https://example.com", "desktop_open_app")]
+    [InlineData("open firefox in the vm", "desktop_open_app")]
+    [InlineData("start notepad", "desktop_open_app")]
+    public void TryMatch_NativeBackend_RoutesBrowserToGuestOpenApp(string text, string expectedTool)
+    {
+        Assert.True(DesktopToolIntent.TryMatch(text, "native", out var match));
+        Assert.Equal(expectedTool, match.ToolName);
     }
 
     // ---------------------------------------------------------------------

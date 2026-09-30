@@ -1,9 +1,12 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using SoulCore.Config;
 using SoulCore.Core;
 using SoulCore.Core.Abstractions;
 using SoulCore.Host.Ws;
 using SoulCore.Inference.Clients;
 using SoulCore.Inference.Tooling;
+using SoulCore.Inference.Tools.Desktop;
 using SoulCore.Memory;
 
 namespace SoulCore.Protocol.Tests;
@@ -54,6 +57,11 @@ public class ChatContextBuilderTests
             new NullEmbeddingClient(),
             charter,
             emotion,
+            new ComputerControlGate(Options.Create(new ToolsOptions
+            {
+                BrowserBackend = "native",
+                DesktopTargetWindowTitle = "victoria-sandbox"
+            })),
             new LoggerFactory().CreateLogger<ChatContextBuilder>());
 
         var ctx = await builder.BuildAsync(
@@ -64,6 +72,9 @@ public class ChatContextBuilderTests
 
         Assert.Contains("[Tools]", ctx.Preamble, StringComparison.Ordinal);
         Assert.Contains("workflow_create", ctx.Preamble, StringComparison.Ordinal);
+        Assert.Contains(ComputerUseGuidance.VmBlock, ctx.Preamble, StringComparison.Ordinal);
+        Assert.Contains("VM PRIMARY", ctx.Preamble, StringComparison.Ordinal);
+        Assert.DoesNotContain("WEB IS NOT THE VM", ctx.Preamble, StringComparison.Ordinal);
         Assert.NotEmpty(ctx.EmotionPreamble);
     }
 
@@ -75,6 +86,7 @@ public class ChatContextBuilderTests
             new NullEmbeddingClient(),
             new ThrowingCharter(),
             new StubEmotionState(),
+            new ComputerControlGate(Options.Create(new ToolsOptions { BrowserBackend = "native" })),
             new LoggerFactory().CreateLogger<ChatContextBuilder>());
 
         var ctx = await builder.BuildAsync("hello", useToolLoop: false, null, CancellationToken.None);
