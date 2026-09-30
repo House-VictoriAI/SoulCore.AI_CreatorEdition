@@ -53,6 +53,7 @@ Reconciled against `main` on **2026-09-15**; re-verified **2026-09-27** (see
 | PROP-12-presence-resizable-shell | Presence frameless resize + adjustable chat/browser/sight panes | **Pass** — 12.1 Accepted 2026-09-27 (PR #94; LinearThrone Windows smoke green) | 12.1 |
 | PROP-12-cua-playwright-resolution | Lock web=Playwright / desktop=CUA+VM; ForceTool health companion | **Decided 2026-09-16** — emergency ship; see `docs/agents/reports/PROP-12-PM01-cua-playwright-decision.md` | emergency |
 | PROP-13-playwright-frame-not-leaked-text | Open Playwright to a URL and show the frame; chat must not echo `<execute_tool>` | **BED Pass** 2026-09-29 — Avenue A 13.1–13.3; QA Windows smoke pending | 13.1–13.3 BED |
+| PROP-14-presence-live-browser-observer | Her screen live Playwright observer + click cursor (CDP; park HWND) | **Draft** 2026-09-30 — TT seats STRAT/CONTRA/SYS/USER; awaiting park vs send-to-PM | 14.1–14.3 suggested |
 
 **Report-only splits (PROP-7…11).** No `PROP-7.1`…`PROP-11.1` ticket files exist. Each shipped
 straight off its proposal + intake and filed a `PROP-{N}.1-BED01-to-PM01.md` Pass report. Recorded
@@ -63,7 +64,7 @@ Cluster map (closed): `docs/archive/proposals/architecture-eval-backlog-cluster-
 Program accept (closed): `docs/archive/tasks/PROP-5-11-PM01-program-accept.md`  
 Scoreboard: `docs/agents/reports/PROP-5-11-TINA-wipeout-final.md`
 
-Next free `N`: **14**.
+Next free `N`: **15**.
 
 ## Open items (not on `main`)
 
