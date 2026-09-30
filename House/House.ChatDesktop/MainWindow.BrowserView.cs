@@ -1,4 +1,5 @@
-using System.IO;
+using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using House.ChatDesktop.Services;
 
@@ -6,6 +7,10 @@ namespace House.ChatDesktop;
 
 public partial class MainWindow
 {
+    private int _browserImagePixelWidth;
+    private int _browserImagePixelHeight;
+    private string? _lastHoverClickHint;
+
     private async Task RefreshVictoriaBrowserViewAsync()
     {
         if (_browserViewBusy) return;
@@ -86,8 +91,10 @@ public partial class MainWindow
     {
         try
         {
-            using var ms = new MemoryStream(imageBytes);
+            using var ms = new System.IO.MemoryStream(imageBytes);
             var bmp = new Bitmap(ms);
+            _browserImagePixelWidth = bmp.PixelSize.Width;
+            _browserImagePixelHeight = bmp.PixelSize.Height;
             if (VictoriaBrowserImage is not null)
             {
                 VictoriaBrowserImage.Source = bmp;
@@ -115,5 +122,73 @@ public partial class MainWindow
         if (VictoriaBrowserEmptyText is not null)
             VictoriaBrowserEmptyText.IsVisible = true;
         _lastBrowserImageHash = null;
+        _browserImagePixelWidth = 0;
+        _browserImagePixelHeight = 0;
+        HideVictoriaBrowserCoords();
+    }
+
+    private void VictoriaBrowserSurface_PointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (VictoriaBrowserSurface is null || VictoriaBrowserImage is null || !VictoriaBrowserImage.IsVisible)
+        {
+            HideVictoriaBrowserCoords();
+            return;
+        }
+
+        var pos = e.GetPosition(VictoriaBrowserSurface);
+        var mapped = VictoriaBrowserCoordMap.TryMapPointerToPage(
+            pos.X,
+            pos.Y,
+            VictoriaBrowserSurface.Bounds.Width,
+            VictoriaBrowserSurface.Bounds.Height,
+            _browserImagePixelWidth,
+            _browserImagePixelHeight);
+
+        if (mapped is null)
+        {
+            HideVictoriaBrowserCoords();
+            return;
+        }
+
+        var (x, y) = mapped.Value;
+        _lastHoverClickHint = VictoriaBrowserCoordMap.FormatClickHint(x, y);
+        if (VictoriaBrowserCoordText is not null)
+            VictoriaBrowserCoordText.Text = _lastHoverClickHint;
+        if (VictoriaBrowserCoordBadge is not null)
+            VictoriaBrowserCoordBadge.IsVisible = true;
+    }
+
+    private void VictoriaBrowserSurface_PointerExited(object? sender, PointerEventArgs e) =>
+        HideVictoriaBrowserCoords();
+
+    private async void VictoriaBrowserSurface_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_lastHoverClickHint))
+            return;
+        if (!e.GetCurrentPoint(VictoriaBrowserSurface).Properties.IsLeftButtonPressed)
+            return;
+
+        var text = _lastHoverClickHint!;
+        try
+        {
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard is not null)
+                await clipboard.SetTextAsync(text).ConfigureAwait(true);
+
+            if (VictoriaBrowserActionText is not null)
+                VictoriaBrowserActionText.Text = $"Copied — tell her: {text}";
+        }
+        catch
+        {
+            if (VictoriaBrowserActionText is not null)
+                VictoriaBrowserActionText.Text = $"Tell her: {text}";
+        }
+    }
+
+    private void HideVictoriaBrowserCoords()
+    {
+        if (VictoriaBrowserCoordBadge is not null)
+            VictoriaBrowserCoordBadge.IsVisible = false;
+        _lastHoverClickHint = null;
     }
 }
