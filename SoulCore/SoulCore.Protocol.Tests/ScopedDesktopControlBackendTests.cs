@@ -429,14 +429,23 @@ public class ScopedDesktopControlBackendTests
     }
 
     [Fact]
-    public void Guidance_ScopedBlock_MentionsTitle()
+    public void Guidance_ScopedBlock_MentionsTitle_PlaywrightMode()
     {
-        var block = ComputerUseGuidance.ScopedBlock("victoria-sandbox");
+        var block = ComputerUseGuidance.ScopedBlock("victoria-sandbox", "playwright");
         Assert.Contains("victoria-sandbox", block, StringComparison.Ordinal);
         Assert.Contains("DESKTOP SCOPE", block, StringComparison.Ordinal);
         Assert.Contains("hard error", block, StringComparison.Ordinal);
         Assert.Contains("guest framebuffer", block, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Do not tell Kayleigh to start VirtualBox", block, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Guidance_ScopedBlock_VmPrimary_WhenNative()
+    {
+        var block = ComputerUseGuidance.ScopedBlock("victoria-sandbox", "native");
+        Assert.Contains("VM PRIMARY", block, StringComparison.Ordinal);
+        Assert.Contains("victoria-sandbox", block, StringComparison.Ordinal);
+        Assert.DoesNotContain("WEB IS NOT THE VM", block, StringComparison.Ordinal);
     }
 
     private sealed class RecordingBackend : IDesktopControlBackend
