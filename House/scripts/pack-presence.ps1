@@ -6,7 +6,8 @@
 #
 # Usage (repo root):
 #   powershell -NoProfile -ExecutionPolicy Bypass -File House/scripts/pack-presence.ps1
-#   powershell -NoProfile -ExecutionPolicy Bypass -File House/scripts/pack-presence.ps1 -Version 0.1.1
+#   powershell -NoProfile -ExecutionPolicy Bypass -File House/scripts/pack-presence.ps1 -Bump
+#   powershell -NoProfile -ExecutionPolicy Bypass -File House/scripts/pack-presence.ps1 -Version 0.1.2
 #
 # Output:
 #   House/artifacts/presence-publish/     published app
@@ -15,10 +16,12 @@
 # Install: run Setup.exe from presence-releases (Start Menu shortcut created by Velopack).
 # Updates: Presence checks GitHub Releases (Linearthrone/SoulCore.AI) or HOUSE_VICTORIA_UPDATE_URL.
 # Upload the contents of presence-releases/ to a GitHub Release (or your HTTP feed).
+# Prefer -Bump (or House/scripts/bump-versions.ps1) before packing so every fix gets a new version.
 
 param(
   [string]$Version = "",
-  [string]$Channel = "win"
+  [string]$Channel = "win",
+  [switch]$Bump
 )
 
 $ErrorActionPreference = 'Stop'
@@ -26,6 +29,12 @@ $ErrorActionPreference = 'Stop'
 $repo = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $csproj = Join-Path $repo 'House\House.ChatDesktop\House.ChatDesktop.csproj'
 if (-not (Test-Path $csproj)) { throw "Missing $csproj" }
+
+if ($Bump) {
+  if ($Version) { throw 'Use either -Bump or -Version, not both.' }
+  & (Join-Path $PSScriptRoot 'bump-versions.ps1') -Target presence -Part patch
+  if ($LASTEXITCODE -ne 0) { throw 'bump-versions.ps1 failed' }
+}
 
 if (-not $Version) {
   [xml]$xml = Get-Content $csproj

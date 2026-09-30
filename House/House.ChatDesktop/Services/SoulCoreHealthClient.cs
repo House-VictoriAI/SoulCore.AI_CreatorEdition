@@ -51,6 +51,9 @@ public sealed class SoulCoreHealthSnapshot
     /// <summary>Source of currentActivity: chat | tool | desktop | life.</summary>
     public string? ActivitySource { get; init; }
 
+    /// <summary>SoulCore.Host assembly version from /health (verify Host fix is running).</summary>
+    public string? HostVersion { get; init; }
+
     public DateTimeOffset CheckedAt { get; init; } = DateTimeOffset.UtcNow;
 
     /// <summary>Alive = host HTTP health answered.</summary>
@@ -132,6 +135,7 @@ public sealed class SoulCoreHealthClient : IDisposable
                 CuaDriverPath = dto?.Tools?.CuaDriverPath,
                 CurrentActivity = dto?.Presence?.CurrentActivity,
                 ActivitySource = dto?.Presence?.ActivitySource,
+                HostVersion = dto?.Version,
                 Detail = null
             };
         }
@@ -152,6 +156,9 @@ public sealed class SoulCoreHealthClient : IDisposable
     {
         [JsonPropertyName("status")]
         public string? Status { get; set; }
+
+        [JsonPropertyName("version")]
+        public string? Version { get; set; }
 
         [JsonPropertyName("phase")]
         public int? Phase { get; set; }
