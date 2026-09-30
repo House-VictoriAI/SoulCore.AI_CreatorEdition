@@ -1,6 +1,6 @@
 ---
 type: proposal
-status: unexecuted
+status: sent-to-pm
 tt_id: TT-01
 prop_id: PROP-14-victoria-browser-live-cursor-pane
 created: 2026-09-30
@@ -10,8 +10,8 @@ need: See Victoria’s mouse with a color change on click, and embed her actual 
 related:
   - docs/archive/proposals/victoria-reliable-workspace-browser.md
   - docs/archive/tasks/TASK-20260819-196-PM01-to-FED01.md
-sent_at:
-pm_intake:
+sent_at: 2026-09-30
+pm_intake: docs/agents/tasks/PROP-14-TT01-to-PM01.md
 kurt_locks:
   pane: hwnd-embed-primary
   click_palette: pink-idle-teal-click
@@ -126,4 +126,4 @@ PM may still decide: intervene = click-through now vs “pause Victoria then Kur
   - **14.5** BED — screencast/JPEG fallback only if embed killed
   - QA — Windows Home PC smoke: see cursor colors, intervene click, no floating twin Chromium
 
-**TT recommendation:** Ready to send-to-PM on request. Primary ship is **embedded Chromium + pink/teal soft cursor**; screencast demoted to fallback.
+**TT recommendation:** Sent to PM-01 2026-09-30. Primary ship is **embedded Chromium + pink/teal soft cursor**; screencast demoted to fallback. Intake: `docs/agents/tasks/PROP-14-TT01-to-PM01.md`.
