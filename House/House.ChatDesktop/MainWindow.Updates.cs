@@ -27,9 +27,22 @@ public partial class MainWindow
                 : "Dev / unpackaged build — installer required for live updates.";
         }
 
+        RefreshBuildVersionChrome(hostVersion: null);
+
         // Quiet background check (installed builds only).
         if (_updates.IsInstalled)
             _ = CheckForUpdatesAsync(showToastIfAvailable: true, fromButton: false);
+    }
+
+    private void RefreshBuildVersionChrome(string? hostVersion)
+    {
+        var presence = _updates?.CurrentVersion ?? "—";
+        var host = string.IsNullOrWhiteSpace(hostVersion) ? "—" : hostVersion.Trim();
+        if (BuildVersionsText is not null)
+            BuildVersionsText.Text = $"Presence {presence} · Host {host}";
+        if (UpdateHostVersionBox is not null)
+            UpdateHostVersionBox.Text = host;
+        Title = $"House Victoria — Presence {presence}";
     }
 
     private async void UpdateCheck_Click(object? sender, RoutedEventArgs e) =>

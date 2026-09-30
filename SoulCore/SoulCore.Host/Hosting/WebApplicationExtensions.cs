@@ -131,6 +131,7 @@ internal static class WebApplicationExtensions
             {
                 status = memoryOk ? "ok" : "degraded",
                 service = "SoulCore.Host",
+                version = HostBuildVersion.Current,
                 bind = opts.Value.BindAddress,
                 port = opts.Value.Port,
                 phase = 1,
