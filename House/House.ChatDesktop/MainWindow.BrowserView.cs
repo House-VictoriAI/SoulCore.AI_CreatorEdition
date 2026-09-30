@@ -54,8 +54,8 @@ public partial class MainWindow
 
         var when = snap.UpdatedAt?.ToLocalTime().ToString("h:mm:ss tt") ?? "-";
         VictoriaBrowserActionText.Text = string.IsNullOrWhiteSpace(snap.LastAction)
-            ? $"No frame yet · {snap.Backend ?? "playwright"} · {when}"
-            : $"{snap.LastAction} · {snap.Backend ?? "playwright"} · {when}";
+            ? $"No frame yet · {snap.Backend ?? "vbox-guest"} · {when}"
+            : $"{snap.LastAction} · {snap.Backend ?? "vbox-guest"} · {when}";
 
         if (VictoriaBrowserWaitingText is not null)
         {

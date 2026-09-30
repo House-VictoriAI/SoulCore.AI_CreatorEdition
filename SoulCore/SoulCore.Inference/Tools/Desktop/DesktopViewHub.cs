@@ -287,6 +287,17 @@ public sealed class DesktopViewHub : IDesktopViewHub
         return true;
     }
 
+    /// <summary>Extract raw image bytes from desktop/browser tool Data for Presence mirrors.</summary>
+    public static bool TryGetImageBytesFromToolData(object? data, out byte[] bytes)
+    {
+        bytes = Array.Empty<byte>();
+        if (data is null)
+            return false;
+        if (!TryExtractImage(data, out bytes, out _, out _, out _, out _))
+            return false;
+        return bytes.Length > 0;
+    }
+
     private string? TryPersistGallery(
         byte[] bytes,
         string format,

@@ -6,7 +6,8 @@ namespace SoulCore.Inference.Tools.Browser;
 /// <summary>
 /// <c>browser_capture_tab</c> — capture current browser tab (screenshot + optional DOM).
 /// Read-only; gated by browser capture session opt-in.
-/// Pushes the PNG into <see cref="IDesktopViewHub"/> so ChatDesktop Desktop preview updates.
+/// Pushes the PNG into <see cref="IDesktopViewHub"/> and Her screen
+/// (<see cref="IVictoriaBrowserViewHub"/>) so Presence updates.
 /// </summary>
 public sealed class BrowserCaptureTabTool : ITool
 {
@@ -17,9 +18,10 @@ public sealed class BrowserCaptureTabTool : ITool
     private readonly IBrowserBridge _bridge;
     private readonly IToolsAccessSettings _access;
     private readonly IDesktopViewHub? _view;
+    private readonly IVictoriaBrowserViewHub? _browserView;
 
     public BrowserCaptureTabTool(IBrowserBridge bridge, IToolsAccessSettings access)
-        : this(bridge, access, view: null)
+        : this(bridge, access, view: null, browserView: null)
     {
     }
 
@@ -27,10 +29,20 @@ public sealed class BrowserCaptureTabTool : ITool
         IBrowserBridge bridge,
         IToolsAccessSettings access,
         IDesktopViewHub? view)
+        : this(bridge, access, view, browserView: null)
+    {
+    }
+
+    public BrowserCaptureTabTool(
+        IBrowserBridge bridge,
+        IToolsAccessSettings access,
+        IDesktopViewHub? view,
+        IVictoriaBrowserViewHub? browserView)
     {
         _bridge = bridge ?? throw new ArgumentNullException(nameof(bridge));
         _access = access ?? throw new ArgumentNullException(nameof(access));
         _view = view;
+        _browserView = browserView;
     }
 
     public ToolDefinition Definition { get; } = new(
@@ -54,16 +66,13 @@ public sealed class BrowserCaptureTabTool : ITool
 
         var result = await _bridge.CaptureTabAsync(tab, ct).ConfigureAwait(false);
         if (result.Success)
-            TryPublishToDesktopView(result);
+            TryPublishToViews(result);
 
         return new ToolResult(result.Success, result.Content, result.Data);
     }
 
-    private void TryPublishToDesktopView(BrowserBridgeResult result)
+    private void TryPublishToViews(BrowserBridgeResult result)
     {
-        if (_view is null)
-            return;
-
         try
         {
             var path = TryGetScreenshotPath(result);
@@ -71,18 +80,35 @@ public sealed class BrowserCaptureTabTool : ITool
             if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
                 bytes = File.ReadAllBytes(path);
 
+            if (bytes is null || bytes.Length == 0)
+            {
+                if (DesktopViewHub.TryGetImageBytesFromToolData(result.Data, out var fromData))
+                    bytes = fromData;
+            }
+
             if (bytes is { Length: > 0 })
             {
                 var (w, h) = TryReadPngSize(bytes);
-                _view.RecordScreenshot(bytes, "png", w, h, path);
-                _view.RecordAction(
+                _view?.RecordScreenshot(bytes, "png", w, h, path);
+                _view?.RecordAction(
                     string.IsNullOrWhiteSpace(path)
                         ? "browser capture (tab)"
                         : $"browser capture {w}x{h} (tab)");
+
+                var backend = string.Equals(_bridge.BackendName, "playwright", StringComparison.OrdinalIgnoreCase)
+                    ? VictoriaBrowserViewHub.BackendPlaywright
+                    : VictoriaBrowserViewHub.BackendVboxGuest;
+                _browserView?.Publish(
+                    bytes,
+                    url: null,
+                    title: backend == VictoriaBrowserViewHub.BackendVboxGuest ? "victoria-sandbox" : null,
+                    lastAction: "browser_capture_tab",
+                    waitingOnYou: null,
+                    backend: backend);
             }
             else if (!string.IsNullOrWhiteSpace(result.Content))
             {
-                _view.RecordAction(Truncate(result.Content, 120));
+                _view?.RecordAction(Truncate(result.Content, 120));
             }
         }
         catch
