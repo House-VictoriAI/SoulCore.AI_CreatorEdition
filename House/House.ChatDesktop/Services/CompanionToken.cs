@@ -58,8 +58,40 @@ public static class CompanionToken
         return applied;
     }
 
+    /// <summary>
+    /// Apply process env from .env (if found) then overlay the Settings-saved token
+    /// when present. Settings wins so an installed app can auth without a repo checkout.
+    /// </summary>
+    public static int ApplyAllSources(string? repoRoot = null)
+    {
+        var applied = TryLoadFromEnvFile(repoRoot);
+        if (ApplySavedSettingsToken())
+            applied++;
+        return applied;
+    }
+
+    /// <summary>
+    /// Push Settings-saved token into process env. Returns true when a saved token was applied.
+    /// </summary>
+    public static bool ApplySavedSettingsToken()
+    {
+        var saved = CompanionTokenStore.Read();
+        if (string.IsNullOrWhiteSpace(saved))
+            return false;
+        var existing = Environment.GetEnvironmentVariable(EnvName);
+        if (string.Equals(existing, saved, StringComparison.Ordinal))
+            return true;
+        Environment.SetEnvironmentVariable(EnvName, saved);
+        return true;
+    }
+
     public static string? Resolve()
     {
+        // Settings store first — operator-entered value for Setup.exe installs.
+        var saved = CompanionTokenStore.Read();
+        if (!string.IsNullOrWhiteSpace(saved))
+            return saved.Trim();
+
         var fromEnv = Environment.GetEnvironmentVariable(EnvName);
         return string.IsNullOrWhiteSpace(fromEnv) ? null : fromEnv.Trim();
     }
@@ -68,9 +100,14 @@ public static class CompanionToken
     public static string DescribePresence()
     {
         var token = Resolve();
+        var source = CompanionTokenStore.HasSavedToken()
+            ? "source=settings"
+            : (Environment.GetEnvironmentVariable(EnvName) is { Length: > 0 }
+                ? "source=env"
+                : "source=none");
         return token is null
-            ? "tokenPresent=false tokenLen=0"
-            : $"tokenPresent=true tokenLen={token.Length}";
+            ? $"tokenPresent=false tokenLen=0 {source}"
+            : $"tokenPresent=true tokenLen={token.Length} {source}";
     }
 
     /// <summary>Path of the .env that would be loaded (for diagnostics; never read secrets).</summary>

@@ -19,7 +19,7 @@ internal static class Program
         // Best-effort early load for repo launches; Velopack installs reload again after
         // LocalUiSettings resolves SoulCoreRepoRoot (see EnsureLocalStackOnOpenAsync).
         var settings = LocalUiSettings.Load();
-        CompanionToken.TryLoadFromEnvFile(settings.SoulCoreRepoRoot);
+        CompanionToken.ApplyAllSources(settings.SoulCoreRepoRoot);
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 

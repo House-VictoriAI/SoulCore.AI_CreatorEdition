@@ -24,6 +24,66 @@ public partial class MainWindow
             SoulCoreRepoRootBox.Text = _uiSettings.SoulCoreRepoRoot ?? _stack.RepoRoot ?? "";
         if (AutoStartStackCheck is not null)
             AutoStartStackCheck.IsChecked = _uiSettings.AutoStartStack;
+        RefreshCompanionTokenStatus();
+    }
+
+    private void RefreshCompanionTokenStatus()
+    {
+        if (CompanionTokenStatusText is null)
+            return;
+        CompanionTokenStatusText.Text = CompanionToken.DescribePresence()
+            + (CompanionTokenStore.HasSavedToken()
+                ? " · saved on this PC"
+                : " · not saved in Settings (will use .env if found)");
+        if (CompanionTokenBox is not null && string.IsNullOrEmpty(CompanionTokenBox.Text))
+        {
+            CompanionTokenBox.Watermark = CompanionTokenStore.HasSavedToken()
+                ? "Saved — type a new token to replace"
+                : "Paste token from SoulCore/.env";
+        }
+    }
+
+    private async void CompanionTokenSave_Click(object? sender, RoutedEventArgs e)
+    {
+        var typed = CompanionTokenBox?.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(typed))
+        {
+            if (CompanionTokenStatusText is not null)
+                CompanionTokenStatusText.Text = "Enter a token to save (or Clear saved to remove).";
+            return;
+        }
+
+        CompanionTokenStore.Save(typed);
+        CompanionToken.ApplySavedSettingsToken();
+        if (CompanionTokenBox is not null)
+            CompanionTokenBox.Text = "";
+        RefreshCompanionTokenStatus();
+        AppendSystemNotice($"Companion token saved · {CompanionToken.DescribePresence()}");
+        await _ws.ConnectAsync().ConfigureAwait(true);
+        await ProbeHealthAsync().ConfigureAwait(true);
+    }
+
+    private async void CompanionTokenClear_Click(object? sender, RoutedEventArgs e)
+    {
+        CompanionTokenStore.Clear();
+        // Re-apply .env if present so we do not leave a stale process env value.
+        Environment.SetEnvironmentVariable(CompanionToken.EnvName, null);
+        CompanionToken.TryLoadFromEnvFile(_uiSettings.SoulCoreRepoRoot ?? _stack.RepoRoot);
+        if (CompanionTokenBox is not null)
+            CompanionTokenBox.Text = "";
+        RefreshCompanionTokenStatus();
+        AppendSystemNotice($"Companion token cleared from Settings · {CompanionToken.DescribePresence()}");
+        await _ws.ConnectAsync().ConfigureAwait(true);
+        await ProbeHealthAsync().ConfigureAwait(true);
+    }
+
+    private async void CompanionTokenReconnect_Click(object? sender, RoutedEventArgs e)
+    {
+        CompanionToken.ApplyAllSources(_uiSettings.SoulCoreRepoRoot ?? _stack.RepoRoot);
+        RefreshCompanionTokenStatus();
+        await _ws.ConnectAsync().ConfigureAwait(true);
+        await ProbeHealthAsync().ConfigureAwait(true);
+        AppendSystemNotice($"WS reconnect · {_ws.State} · {CompanionToken.DescribePresence()}");
     }
 
     private void SoulCoreRepoRootBox_LostFocus(object? sender, RoutedEventArgs e)
@@ -72,7 +132,9 @@ public partial class MainWindow
             }
 
             // Critical for Setup.exe installs: Program.cs ran too early to find SoulCore/.env.
-            ReloadCompanionTokenFromRepo();
+            // Settings-saved token (if any) overlays .env.
+            CompanionToken.ApplyAllSources(_uiSettings.SoulCoreRepoRoot ?? _stack.RepoRoot);
+            RefreshCompanionTokenStatus();
 
             if (!_uiSettings.AutoStartStack)
             {
@@ -99,7 +161,8 @@ public partial class MainWindow
 
             var result = await _stack.EnsureStackForChatAsync(progress: progress).ConfigureAwait(true);
             // Host may have loaded .env; Presence must match before WS connect.
-            ReloadCompanionTokenFromRepo();
+            CompanionToken.ApplyAllSources(_uiSettings.SoulCoreRepoRoot ?? _stack.RepoRoot);
+            RefreshCompanionTokenStatus();
 
             if (result.Ok)
             {
@@ -126,18 +189,15 @@ public partial class MainWindow
 
     private void ReloadCompanionTokenFromRepo()
     {
-        var root = _uiSettings.SoulCoreRepoRoot ?? _stack.RepoRoot;
-        var applied = CompanionToken.TryLoadFromEnvFile(root);
-        var envPath = CompanionToken.ResolvedEnvFilePath(root);
-        if (applied > 0)
-        {
-            if (ServicesStatusText is not null)
-                ServicesStatusText.Text = $"Loaded {applied} SOULCORE_* from .env";
-        }
-        else if (envPath is null)
+        CompanionToken.ApplyAllSources(_uiSettings.SoulCoreRepoRoot ?? _stack.RepoRoot);
+        RefreshCompanionTokenStatus();
+        var envPath = CompanionToken.ResolvedEnvFilePath(_uiSettings.SoulCoreRepoRoot ?? _stack.RepoRoot);
+        if (!CompanionTokenStore.HasSavedToken()
+            && CompanionToken.Resolve() is null
+            && envPath is null)
         {
             AppendSystemNotice(
-                "No SoulCore/.env found for companion token. Set SoulCore repo folder in Settings → System.");
+                "No companion token yet — paste SOULCORE_COMPANION_API_TOKEN in Settings → System, or set SoulCore repo folder so .env can load.");
         }
     }
 
@@ -509,6 +569,7 @@ public partial class MainWindow
     {
         await ProbeHealthAsync();
         ApplySystemStatus(_lastHealth);
+        RefreshCompanionTokenStatus();
     }
 
     private void WirePushToTalk()
