@@ -1,7 +1,7 @@
 ---
 type: config
 id: PROP-NUMBERING
-updated: 2026-09-29
+updated: 2026-09-30
 owner: PM-01 / TT-01
 ---
 
@@ -78,6 +78,7 @@ Next free `N`: **15**.
 | **PROP-4.2** | OPS-01 | **Partial** on `cursor/prop42-presence-installer-9531` — Update button + pack script; needs Windows Setup.exe + published feed smoke |
 | **PROP-3** | — | Parked until SMS QA Pass |
 | **PROP-13** | BED-01 | Ticketed 2026-09-29. Avenue A: 13.1 intent+URL, 13.2 reply firewall, 13.3 capture gate + private-host reject. |
+| **PROP-14** | PM-01 | Sent 2026-09-30. Intake `PROP-14-TT01-to-PM01.md`. HWND embed + pink→teal cursor; awaiting PM splits 14.1–14.5. |
 
 Legacy non-PROP tickets still Pending: `TASK-123`, `TASK-137`, `TASK-139` (QA gates),
 `TASK-191` (Partial) / `TASK-192` (Queued) under REX.
