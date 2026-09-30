@@ -124,8 +124,8 @@ public partial class MainWindow : Window
         _desktopViewTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
         _desktopViewTimer.Tick += async (_, _) => await RefreshDesktopViewAsync();
 
-        // FED-196: near-live Victoria Playwright pane (~2 fps when frames arrive).
-        _browserViewTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        // FED-196: near-live Victoria Playwright pane (~5 fps so aim cursor is visible while she drives).
+        _browserViewTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         _browserViewTimer.Tick += async (_, _) => await RefreshVictoriaBrowserViewAsync();
 
         Opened += async (_, _) =>

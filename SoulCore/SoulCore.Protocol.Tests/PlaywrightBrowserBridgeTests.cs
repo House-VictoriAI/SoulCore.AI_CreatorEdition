@@ -113,6 +113,43 @@ public class PlaywrightBrowserBridgeTests
     }
 
     [Fact]
+    public void AimDwellMs_ExceedsPresenceBrowserPollInterval()
+    {
+        // House Presence refreshes Her browser every ~200ms — aim must outlast several polls.
+        Assert.True(PlaywrightBrowserBridge.AimDwellMs >= 600,
+            $"AimDwellMs={PlaywrightBrowserBridge.AimDwellMs} must leave the aim frame up long enough to see");
+    }
+
+    [Theory]
+    [InlineData("Login", true)]
+    [InlineData("log in", true)]
+    [InlineData("Sign in", true)]
+    [InlineData("SIGN-IN", true)]
+    [InlineData("Continue", false)]
+    [InlineData("Next", false)]
+    public void IsLoginFamilyLabel_DetectsCommonVariants(string label, bool expected)
+    {
+        Assert.Equal(expected, PlaywrightBrowserBridge.IsLoginFamilyLabel(label));
+    }
+
+    [Fact]
+    public void ExpandClickLabels_Login_IncludesSignInAliases()
+    {
+        var labels = PlaywrightBrowserBridge.ExpandClickLabels("Login");
+        Assert.Contains("Login", labels);
+        Assert.Contains("Sign in", labels);
+        Assert.Contains("Log in", labels);
+        Assert.True(labels.Count >= 3);
+    }
+
+    [Fact]
+    public void ExpandClickLabels_NonLogin_StaysSingle()
+    {
+        var labels = PlaywrightBrowserBridge.ExpandClickLabels("Accept cookies");
+        Assert.Equal(new[] { "Accept cookies" }, labels);
+    }
+
+    [Fact]
     public void BurnInMarker_DrawsCrosshair_KeepsValidJpeg()
     {
         using var img = new Image<Rgba32>(80, 60, new Rgba32(20, 20, 20));
