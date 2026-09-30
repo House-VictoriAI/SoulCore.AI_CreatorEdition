@@ -1,0 +1,68 @@
+# Pack Presence (Velopack) on Windows and publish a GitHub Release so the in-app Update button has a feed.
+name: Presence Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "House/House.ChatDesktop/House.ChatDesktop.csproj"
+      - "House/scripts/pack-presence.ps1"
+      - ".github/workflows/presence-release.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: presence-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pack-and-publish:
+    name: pack + publish Presence
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Read Presence version
+        id: ver
+        shell: pwsh
+        run: |
+          [xml]$xml = Get-Content House/House.ChatDesktop/House.ChatDesktop.csproj
+          $v = $xml.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if (-not $v) { throw 'Missing <Version> in House.ChatDesktop.csproj' }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Presence version $v"
+
+      - name: Skip if release tag already exists
+        id: skip
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="presence-v${{ steps.ver.outputs.version }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG already exists — skipping pack."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pack and publish Presence release
+        if: steps.skip.outputs.exists != 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File House/scripts/pack-presence.ps1 `
+            -Version "${{ steps.ver.outputs.version }}" `
+            -Publish

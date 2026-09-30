@@ -3,11 +3,13 @@
 # Prerequisites (Windows):
 #   dotnet tool install -g vpk
 #   (same major as Velopack package in House.ChatDesktop.csproj)
+#   For -Publish: GitHub CLI `gh` authenticated with repo release rights
 #
 # Usage (repo root):
 #   powershell -NoProfile -ExecutionPolicy Bypass -File House/scripts/pack-presence.ps1
 #   powershell -NoProfile -ExecutionPolicy Bypass -File House/scripts/pack-presence.ps1 -Bump
-#   powershell -NoProfile -ExecutionPolicy Bypass -File House/scripts/pack-presence.ps1 -Version 0.1.2
+#   powershell -NoProfile -ExecutionPolicy Bypass -File House/scripts/pack-presence.ps1 -Bump -Publish
+#   powershell -NoProfile -ExecutionPolicy Bypass -File House/scripts/pack-presence.ps1 -Version 0.1.2 -Publish
 #
 # Output:
 #   House/artifacts/presence-publish/     published app
@@ -18,13 +20,14 @@
 # Point Settings → System → SoulCore repo folder at your checkout (folder with ALLSTART.ps1),
 # or set HOUSE_SOULCORE_REPO — required when the app is installed outside the repo.
 # Updates: Presence checks GitHub Releases (Linearthrone/SoulCore.AI) or HOUSE_VICTORIA_UPDATE_URL.
-# Upload the contents of presence-releases/ to a GitHub Release (or your HTTP feed).
+# -Publish uploads presence-releases/* to a GitHub Release tag presence-v{version} so Update works.
 # Prefer -Bump (or House/scripts/bump-versions.ps1) before packing so every fix gets a new version.
 
 param(
   [string]$Version = "",
   [string]$Channel = "win",
-  [switch]$Bump
+  [switch]$Bump,
+  [switch]$Publish
 )
 
 $ErrorActionPreference = 'Stop'
@@ -84,4 +87,31 @@ if ($LASTEXITCODE -ne 0) { throw 'vpk pack failed' }
 Write-Host ''
 Write-Host "Done. Installer folder: $releaseDir"
 Write-Host 'Run Setup.exe on the target PC. Then Presence Settings > Updates (or title Update) to check for newer releases.'
-Write-Host 'Publish tip: attach the release files to a GitHub Release so GithubSource can find them.'
+
+if ($Publish) {
+  $gh = Get-Command gh -ErrorAction SilentlyContinue
+  if (-not $gh) { throw 'gh CLI not found — install GitHub CLI to use -Publish.' }
+
+  $tag = "presence-v$Version"
+  $assets = @(Get-ChildItem -Path $releaseDir -File | ForEach-Object { $_.FullName })
+  if ($assets.Count -eq 0) { throw "No files in $releaseDir to publish." }
+
+  & gh release view $tag 2>$null | Out-Null
+  if ($LASTEXITCODE -eq 0) {
+    Write-Host "Release $tag already exists — uploading/replacing assets..."
+    & gh release upload $tag @assets --clobber
+    if ($LASTEXITCODE -ne 0) { throw "gh release upload failed for $tag" }
+  }
+  else {
+    Write-Host "Creating GitHub Release $tag ..."
+    & gh release create $tag @assets `
+      --title "Presence $Version" `
+      --notes "House Victoria Presence $Version (Velopack). Install Setup.exe, or use Update in an existing install. Host is separate — restart Host for Playwright/tool fixes."
+    if ($LASTEXITCODE -ne 0) { throw "gh release create failed for $tag" }
+  }
+
+  Write-Host "Published $tag — installed Presence can now use Update."
+}
+else {
+  Write-Host 'To feed the Update button: re-run with -Publish (or let the Presence Release GitHub Action pack on main).'
+}
