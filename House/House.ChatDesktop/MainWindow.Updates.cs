@@ -23,8 +23,8 @@ public partial class MainWindow
         if (UpdateStatusText is not null)
         {
             UpdateStatusText.Text = _updates.IsInstalled
-                ? "Installed build — Check for updates when you want."
-                : "Dev / unpackaged build — installer required for live updates.";
+                ? "Installed build — Update downloads Presence from GitHub Releases when a presence-v* release exists."
+                : "Unpackaged build — Update cannot install. Pack with pack-presence.ps1 -Publish, install Setup.exe, then Update works.";
         }
 
         RefreshBuildVersionChrome(hostVersion: null);
@@ -92,7 +92,7 @@ public partial class MainWindow
         try
         {
             var result = await _updates.CheckAsync();
-            await Dispatcher.UIThread.InvokeAsync(() => ApplyUpdateCheckResult(result, showToastIfAvailable));
+            await Dispatcher.UIThread.InvokeAsync(() => ApplyUpdateCheckResult(result, showToastIfAvailable, fromButton));
         }
         finally
         {
@@ -101,7 +101,7 @@ public partial class MainWindow
         }
     }
 
-    private void ApplyUpdateCheckResult(PresenceUpdateCheckResult result, bool showToastIfAvailable)
+    private void ApplyUpdateCheckResult(PresenceUpdateCheckResult result, bool showToastIfAvailable, bool fromButton)
     {
         _pendingUpdate = result.Update;
         if (UpdateApplyButton is not null)
@@ -113,7 +113,10 @@ public partial class MainWindow
 
         if (result.Status == PresenceUpdateCheckResult.Kind.Available && showToastIfAvailable)
             ShowUpdateToast(result.Message, showAction: true);
-        else if (result.Status == PresenceUpdateCheckResult.Kind.Failed && showToastIfAvailable)
+        else if (showToastIfAvailable && fromButton
+                 && result.Status is PresenceUpdateCheckResult.Kind.Failed
+                     or PresenceUpdateCheckResult.Kind.FeedEmpty
+                     or PresenceUpdateCheckResult.Kind.DevBuild)
             ShowUpdateToast(result.Message, showAction: false);
     }
 

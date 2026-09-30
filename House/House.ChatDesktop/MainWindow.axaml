@@ -757,7 +757,7 @@
               <StackPanel Margin="12" Spacing="6">
                 <TextBlock Text="Updates" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" FontSize="12"
-                           Text="Presence installs like a normal Windows app (Setup.exe). Host (Playwright / tools) updates when you rebuild and restart Host — check both version numbers after every fix."
+                           Text="Update downloads Presence (this app) from GitHub Releases after a pack is published. It does not update Host — restart Host for Playwright/tool fixes. If the feed is empty, publish with pack-presence.ps1 -Publish (or the Presence Release Action)."
                            Margin="0,0,0,12"/>
                 <TextBlock Text="Presence version" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"/>
                 <TextBox x:Name="UpdateVersionBox" Classes="input" IsReadOnly="True" Text="—"
