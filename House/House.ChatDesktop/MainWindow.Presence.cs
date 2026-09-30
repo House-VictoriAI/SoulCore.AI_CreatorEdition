@@ -96,6 +96,15 @@ public partial class MainWindow
         PersistStackSettingsFromUi();
     }
 
+    private async void HostStart_Click(object? sender, RoutedEventArgs e) =>
+        await RunServiceActionAsync("host-start").ConfigureAwait(true);
+
+    private async void HostStop_Click(object? sender, RoutedEventArgs e) =>
+        await RunServiceActionAsync("host-stop").ConfigureAwait(true);
+
+    private async void HostRestart_Click(object? sender, RoutedEventArgs e) =>
+        await RunServiceActionAsync("host-restart").ConfigureAwait(true);
+
     private void PersistStackSettingsFromUi()
     {
         var path = SoulCoreRepoRootBox?.Text?.Trim();
@@ -480,8 +489,17 @@ public partial class MainWindow
     {
         if (_servicesBusy) return;
         _servicesBusy = true;
+        SetHostStackButtonsBusy(true);
         if (ServicesStatusText is not null)
             ServicesStatusText.Text = $"Running {tag}…";
+        if (HostStackStatusText is not null)
+            HostStackStatusText.Text = tag switch
+            {
+                "host-start" => "Starting Host…",
+                "host-stop" => "Stopping Host…",
+                "host-restart" => "Restarting Host…",
+                _ => $"Running {tag}…"
+            };
 
         try
         {
@@ -490,6 +508,7 @@ public partial class MainWindow
             {
                 case "host-start":
                 {
+                    PersistStackSettingsFromUi();
                     var ensure = await _stack.EnsureStackForChatAsync().ConfigureAwait(true);
                     result = ensure.Ok
                         ? LocalStackActionResult.Succeed(ensure.Detail)
@@ -497,9 +516,11 @@ public partial class MainWindow
                     break;
                 }
                 case "host-stop":
+                    PersistStackSettingsFromUi();
                     result = await _stack.StopHostAsync().ConfigureAwait(true);
                     break;
                 case "host-restart":
+                    PersistStackSettingsFromUi();
                     result = await _stack.RestartHostAsync().ConfigureAwait(true);
                     break;
                 case "ollama-start":
@@ -534,20 +555,42 @@ public partial class MainWindow
                     break;
             }
 
+            var msg = result.Ok ? $"OK: {result.Detail}" : $"Fail: {result.Detail}";
             if (ServicesStatusText is not null)
-                ServicesStatusText.Text = result.Ok ? $"OK: {result.Detail}" : $"Fail: {result.Detail}";
+                ServicesStatusText.Text = msg;
+            if (HostStackStatusText is not null
+                && tag is "host-start" or "host-stop" or "host-restart")
+                HostStackStatusText.Text = msg;
+
+            if (result.Ok && tag is "host-start" or "host-restart")
+            {
+                CompanionToken.ApplyAllSources(_uiSettings.SoulCoreRepoRoot ?? _stack.RepoRoot);
+                await _ws.ConnectAsync().ConfigureAwait(true);
+            }
 
             await ProbeHealthAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
+            var err = $"Error: {ex.Message}";
             if (ServicesStatusText is not null)
-                ServicesStatusText.Text = $"Error: {ex.Message}";
+                ServicesStatusText.Text = err;
+            if (HostStackStatusText is not null
+                && tag is "host-start" or "host-stop" or "host-restart")
+                HostStackStatusText.Text = err;
         }
         finally
         {
             _servicesBusy = false;
+            SetHostStackButtonsBusy(false);
         }
+    }
+
+    private void SetHostStackButtonsBusy(bool busy)
+    {
+        if (HostStartButton is not null) HostStartButton.IsEnabled = !busy;
+        if (HostStopButton is not null) HostStopButton.IsEnabled = !busy;
+        if (HostRestartButton is not null) HostRestartButton.IsEnabled = !busy;
     }
 
     private async void ServicesRefresh_Click(object? sender, RoutedEventArgs e)
