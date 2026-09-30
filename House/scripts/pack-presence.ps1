@@ -13,6 +13,9 @@
 #   House/artifacts/presence-releases/  Setup.exe + nupkg + releases.*.json
 #
 # Install: run Setup.exe from presence-releases (Start Menu shortcut created by Velopack).
+# Presence auto-starts SoulCore.Host + Ollama on open when Auto-start is enabled (default).
+# Point Settings → System → SoulCore repo folder at your checkout (folder with ALLSTART.ps1),
+# or set HOUSE_SOULCORE_REPO — required when the app is installed outside the repo.
 # Updates: Presence checks GitHub Releases (Linearthrone/SoulCore.AI) or HOUSE_VICTORIA_UPDATE_URL.
 # Upload the contents of presence-releases/ to a GitHub Release (or your HTTP feed).
 

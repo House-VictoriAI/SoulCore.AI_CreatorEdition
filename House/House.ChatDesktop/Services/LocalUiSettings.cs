@@ -46,6 +46,18 @@ public sealed class LocalUiSettings
     /// </summary>
     public string? UpdateFeedUrl { get; set; }
 
+    /// <summary>
+    /// Absolute path to the SoulCore checkout (folder with ALLSTART.ps1).
+    /// Required when Presence is installed outside the repo (Velopack Setup.exe).
+    /// Override also via env HOUSE_SOULCORE_REPO.
+    /// </summary>
+    public string? SoulCoreRepoRoot { get; set; }
+
+    /// <summary>
+    /// When true (default), Presence starts Ollama + Host on open if they are down.
+    /// </summary>
+    public bool AutoStartStack { get; set; } = true;
+
     public static string StorePath =>
         Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

@@ -13,10 +13,14 @@ public static class CompanionToken
     /// <b>.env wins</b> over stale Process/User-inherited values — same footgun as Host
     /// (HTTP /health looks "up" while /ws 401s with the wrong Bearer).
     /// </summary>
-    /// <returns>Count of keys set or updated.</returns>
-    public static int TryLoadFromEnvFile()
+    /// <param name="repoRoot">
+    /// Optional SoulCore checkout root (folder with ALLSTART.ps1). Required for Velopack
+    /// installs whose BaseDirectory is outside the repo.
+    /// </param>
+    /// <returns>Count of keys set or updated; 0 if no .env found.</returns>
+    public static int TryLoadFromEnvFile(string? repoRoot = null)
     {
-        var envPath = FindSoulCoreEnvFile();
+        var envPath = FindSoulCoreEnvFile(repoRoot);
         if (envPath is null)
             return 0;
 
@@ -54,8 +58,40 @@ public static class CompanionToken
         return applied;
     }
 
+    /// <summary>
+    /// Apply process env from .env (if found) then overlay the Settings-saved token
+    /// when present. Settings wins so an installed app can auth without a repo checkout.
+    /// </summary>
+    public static int ApplyAllSources(string? repoRoot = null)
+    {
+        var applied = TryLoadFromEnvFile(repoRoot);
+        if (ApplySavedSettingsToken())
+            applied++;
+        return applied;
+    }
+
+    /// <summary>
+    /// Push Settings-saved token into process env. Returns true when a saved token was applied.
+    /// </summary>
+    public static bool ApplySavedSettingsToken()
+    {
+        var saved = CompanionTokenStore.Read();
+        if (string.IsNullOrWhiteSpace(saved))
+            return false;
+        var existing = Environment.GetEnvironmentVariable(EnvName);
+        if (string.Equals(existing, saved, StringComparison.Ordinal))
+            return true;
+        Environment.SetEnvironmentVariable(EnvName, saved);
+        return true;
+    }
+
     public static string? Resolve()
     {
+        // Settings store first — operator-entered value for Setup.exe installs.
+        var saved = CompanionTokenStore.Read();
+        if (!string.IsNullOrWhiteSpace(saved))
+            return saved.Trim();
+
         var fromEnv = Environment.GetEnvironmentVariable(EnvName);
         return string.IsNullOrWhiteSpace(fromEnv) ? null : fromEnv.Trim();
     }
@@ -64,10 +100,19 @@ public static class CompanionToken
     public static string DescribePresence()
     {
         var token = Resolve();
+        var source = CompanionTokenStore.HasSavedToken()
+            ? "source=settings"
+            : (Environment.GetEnvironmentVariable(EnvName) is { Length: > 0 }
+                ? "source=env"
+                : "source=none");
         return token is null
-            ? "tokenPresent=false tokenLen=0"
-            : $"tokenPresent=true tokenLen={token.Length}";
+            ? $"tokenPresent=false tokenLen=0 {source}"
+            : $"tokenPresent=true tokenLen={token.Length} {source}";
     }
+
+    /// <summary>Path of the .env that would be loaded (for diagnostics; never read secrets).</summary>
+    public static string? ResolvedEnvFilePath(string? repoRoot = null) =>
+        FindSoulCoreEnvFile(repoRoot);
 
     private static string Unquote(string raw)
     {
@@ -80,36 +125,49 @@ public static class CompanionToken
         return raw;
     }
 
-    private static string? FindSoulCoreEnvFile()
+    private static string? FindSoulCoreEnvFile(string? repoRoot)
     {
-        // bin/{config}/net8.0 → House.ChatDesktop → House → repo root → SoulCore/.env
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        for (var i = 0; i < 8 && dir is not null; i++, dir = dir.Parent)
+        foreach (var candidate in EnumerateEnvFileCandidates(repoRoot))
         {
-            var candidate = Path.Combine(dir.FullName, "SoulCore", ".env");
             if (File.Exists(candidate))
                 return candidate;
-            candidate = Path.Combine(dir.FullName, ".env");
-            if (File.Exists(candidate) && dir.Name.Equals("SoulCore", StringComparison.OrdinalIgnoreCase))
-                return candidate;
-        }
-
-        // Also walk from cwd (dotnet run from repo root).
-        try
-        {
-            dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-            for (var i = 0; i < 6 && dir is not null; i++, dir = dir.Parent)
-            {
-                var candidate = Path.Combine(dir.FullName, "SoulCore", ".env");
-                if (File.Exists(candidate))
-                    return candidate;
-            }
-        }
-        catch
-        {
-            // ignore
         }
 
         return null;
+    }
+
+    public static IEnumerable<string> EnumerateEnvFileCandidates(string? repoRoot)
+    {
+        foreach (var root in LocalStackControl.EnumerateRepoRootCandidates(repoRoot))
+        {
+            if (string.IsNullOrWhiteSpace(root))
+                continue;
+            yield return Path.Combine(root, "SoulCore", ".env");
+            if (root.EndsWith("SoulCore", StringComparison.OrdinalIgnoreCase)
+                || root.EndsWith($"SoulCore{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+                || root.EndsWith($"SoulCore{Path.AltDirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            {
+                yield return Path.Combine(root, ".env");
+            }
+        }
+
+        // Legacy walk from BaseDirectory / cwd (dev launches).
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        for (var i = 0; i < 8 && dir is not null; i++, dir = dir.Parent)
+        {
+            yield return Path.Combine(dir.FullName, "SoulCore", ".env");
+            if (dir.Name.Equals("SoulCore", StringComparison.OrdinalIgnoreCase))
+                yield return Path.Combine(dir.FullName, ".env");
+        }
+
+        string? cwd = null;
+        try { cwd = Directory.GetCurrentDirectory(); }
+        catch { /* ignore */ }
+        if (!string.IsNullOrWhiteSpace(cwd))
+        {
+            dir = new DirectoryInfo(cwd);
+            for (var i = 0; i < 6 && dir is not null; i++, dir = dir.Parent)
+                yield return Path.Combine(dir.FullName, "SoulCore", ".env");
+        }
     }
 }

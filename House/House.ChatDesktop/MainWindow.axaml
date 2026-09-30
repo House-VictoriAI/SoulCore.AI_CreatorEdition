@@ -643,6 +643,26 @@
                 <TextBlock Text="Host endpoint" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"/>
                 <TextBox x:Name="SystemEndpointBox" Classes="input" IsReadOnly="True" Text="127.0.0.1:7700"
                          Padding="8" Margin="0,0,0,10"/>
+                <TextBlock Text="SoulCore repo folder" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"/>
+                <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"
+                           Text="Folder that contains ALLSTART.ps1 (needed when Presence was installed via Setup.exe). Also: HOUSE_SOULCORE_REPO."/>
+                <TextBox x:Name="SoulCoreRepoRootBox" Classes="input" Watermark="e.g. C:\Users\you\Soul_Core"
+                         Padding="8" Margin="0,0,0,6" LostFocus="SoulCoreRepoRootBox_LostFocus"/>
+                <CheckBox x:Name="AutoStartStackCheck" Content="Auto-start Host + Ollama when Presence opens"
+                          IsChecked="True" Margin="0,0,0,10" Click="AutoStartStackCheck_Click"/>
+                <TextBlock Text="Companion API token" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"/>
+                <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"
+                           Text="Same value as SOULCORE_COMPANION_API_TOKEN in SoulCore/.env. Required for chat when Host has companion auth on. Saved only on this PC."/>
+                <TextBox x:Name="CompanionTokenBox" Classes="input" PasswordChar="•"
+                         Watermark="Paste token — leave blank to keep saved"
+                         Padding="8" Margin="0,0,0,6"/>
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+                  <Button Classes="primary" Content="Save token" Click="CompanionTokenSave_Click"/>
+                  <Button Classes="ghost" Content="Clear saved" Click="CompanionTokenClear_Click"/>
+                  <Button Classes="ghost" Content="Reconnect WS" Click="CompanionTokenReconnect_Click"/>
+                </StackPanel>
+                <TextBlock x:Name="CompanionTokenStatusText" FontSize="11" Foreground="{DynamicResource MutedBrush}"
+                           Text="" Margin="0,0,0,10"/>
                 <TextBlock Text="Bind address" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,4"/>
                 <TextBox x:Name="SystemBindBox" Classes="input" IsReadOnly="True" Text="—"
                          Padding="8" Margin="0,0,0,10"/>

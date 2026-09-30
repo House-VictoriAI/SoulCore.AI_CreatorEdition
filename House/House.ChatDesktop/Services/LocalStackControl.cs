@@ -11,10 +11,26 @@ public sealed class LocalStackControl : IDisposable
 {
     public const string OllamaTagsUrl = "http://127.0.0.1:11434/api/tags";
     public const string ComfyUiUrl = "http://127.0.0.1:8188/system_stats";
+    public const string DefaultHostHealthUrl = "http://127.0.0.1:7700/health";
+
+    /// <summary>Env override for repo root when Presence is installed outside the checkout.</summary>
+    public const string RepoRootEnvName = "HOUSE_SOULCORE_REPO";
 
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(4) };
+    private string? _repoRoot;
 
-    public string? RepoRoot { get; } = FindRepoRoot();
+    public LocalStackControl(string? configuredRepoRoot = null)
+    {
+        _repoRoot = ResolveRepoRoot(configuredRepoRoot);
+    }
+
+    public string? RepoRoot => _repoRoot;
+
+    /// <summary>
+    /// Update persisted/config root and re-resolve (e.g. after Settings save).
+    /// </summary>
+    public void SetConfiguredRepoRoot(string? configuredRepoRoot) =>
+        _repoRoot = ResolveRepoRoot(configuredRepoRoot);
 
     public async Task<bool> ProbeUrlAsync(string url, CancellationToken ct = default)
     {
@@ -34,6 +50,12 @@ public sealed class LocalStackControl : IDisposable
 
     public Task<bool> ProbeComfyAsync(CancellationToken ct = default) =>
         ProbeUrlAsync(ComfyUiUrl, ct);
+
+    public Task<bool> ProbeHostHealthAsync(CancellationToken ct = default)
+    {
+        var url = $"http://{ConnectionDefaults.Host}:{ConnectionDefaults.Port}/health";
+        return ProbeUrlAsync(url, ct);
+    }
 
     /// <summary>
     /// PROP-4: victoria-sandbox running? Loopback/local VBoxManage only.
@@ -125,6 +147,82 @@ $r2 = Invoke-WebRequest -Uri 'http://127.0.0.1:11434/api/tags' -UseBasicParsing 
     public Task<LocalStackActionResult> RestartChatDesktopAsync(CancellationToken ct = default) =>
         RunScriptAsync("start-desktopgui.ps1", Array.Empty<string>(), ct, wait: false);
 
+    /// <summary>
+    /// Ensure chat can work: Ollama (if missing) + SoulCore.Host on loopback.
+    /// Does not relaunch Presence / ALLSTART GUI (avoids duplicate windows).
+    /// </summary>
+    public async Task<LocalStackEnsureResult> EnsureStackForChatAsync(
+        CancellationToken ct = default,
+        int hostReadyTimeoutSec = 90,
+        IProgress<string>? progress = null)
+    {
+        if (RepoRoot is null)
+        {
+            return LocalStackEnsureResult.Fail(
+                "SoulCore repo not found. Set HOUSE_SOULCORE_REPO or Presence Settings → SoulCore repo folder " +
+                "(the folder that contains ALLSTART.ps1), then reopen Presence.");
+        }
+
+        progress?.Report($"Repo: {RepoRoot}");
+
+        var ollamaWasUp = await ProbeOllamaAsync(ct).ConfigureAwait(false);
+        if (!ollamaWasUp)
+        {
+            progress?.Report("Starting Ollama…");
+            var ollama = await StartOllamaAsync(ct).ConfigureAwait(false);
+            if (!ollama.Ok)
+            {
+                // Host can still start; chat will fail without a model — surface warning but continue.
+                progress?.Report($"Ollama: {ollama.Detail}");
+            }
+            else
+            {
+                progress?.Report("Ollama up");
+            }
+        }
+        else
+        {
+            progress?.Report("Ollama already up");
+        }
+
+        var hostWasUp = await ProbeHostHealthAsync(ct).ConfigureAwait(false);
+        if (hostWasUp)
+        {
+            progress?.Report("Host already up");
+            return LocalStackEnsureResult.Succeed(
+                hostStarted: false,
+                ollamaStarted: !ollamaWasUp,
+                detail: "Host already listening; stack ready.");
+        }
+
+        progress?.Report("Starting SoulCore.Host…");
+        var start = await StartHostAsync(ct).ConfigureAwait(false);
+        if (!start.Ok)
+        {
+            return LocalStackEnsureResult.Fail($"Host start failed: {start.Detail}");
+        }
+
+        var deadline = DateTime.UtcNow.AddSeconds(Math.Clamp(hostReadyTimeoutSec, 15, 300));
+        while (DateTime.UtcNow < deadline)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (await ProbeHostHealthAsync(ct).ConfigureAwait(false))
+            {
+                progress?.Report("Host healthy");
+                return LocalStackEnsureResult.Succeed(
+                    hostStarted: true,
+                    ollamaStarted: !ollamaWasUp,
+                    detail: start.Detail);
+            }
+
+            progress?.Report("Waiting for Host /health…");
+            await Task.Delay(1000, ct).ConfigureAwait(false);
+        }
+
+        return LocalStackEnsureResult.Fail(
+            $"Host start ran but /health did not answer within {hostReadyTimeoutSec}s. Detail: {start.Detail}");
+    }
+
     private Task<LocalStackActionResult> RunScriptAsync(
         string relativeScript,
         IReadOnlyList<string> extraArgs,
@@ -132,7 +230,8 @@ $r2 = Invoke-WebRequest -Uri 'http://127.0.0.1:11434/api/tags' -UseBasicParsing 
         bool wait = true)
     {
         if (RepoRoot is null)
-            return Task.FromResult(LocalStackActionResult.Fail("repo root not found (SoulCore/.env or ALLSTART.ps1)"));
+            return Task.FromResult(LocalStackActionResult.Fail(
+                "repo root not found — set HOUSE_SOULCORE_REPO or Settings → SoulCore repo folder"));
 
         var script = Path.Combine(RepoRoot, relativeScript);
         if (!File.Exists(script))
@@ -173,15 +272,18 @@ $r2 = Invoke-WebRequest -Uri 'http://127.0.0.1:11434/api/tags' -UseBasicParsing 
     {
         try
         {
+            var resolvedExe = ResolveWindowsExecutable(fileName) ?? fileName;
             var psi = new ProcessStartInfo
             {
-                FileName = fileName,
+                FileName = resolvedExe,
                 WorkingDirectory = workingDirectory,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
             };
+            // Start Menu / Velopack launches often miss User PATH (dotnet).
+            EnrichPathForStackTools(psi);
             foreach (var a in args)
                 psi.ArgumentList.Add(a);
 
@@ -210,6 +312,50 @@ $r2 = Invoke-WebRequest -Uri 'http://127.0.0.1:11434/api/tags' -UseBasicParsing 
         }
     }
 
+    private static string? ResolveWindowsExecutable(string fileName)
+    {
+        if (!OperatingSystem.IsWindows())
+            return null;
+        if (fileName.Equals("powershell.exe", StringComparison.OrdinalIgnoreCase)
+            || fileName.Equals("powershell", StringComparison.OrdinalIgnoreCase))
+        {
+            var systemRoot = Environment.GetFolderPath(Environment.SpecialFolder.System);
+            var candidate = Path.Combine(systemRoot, "WindowsPowerShell", "v1.0", "powershell.exe");
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        return null;
+    }
+
+    private static void EnrichPathForStackTools(ProcessStartInfo psi)
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+        try
+        {
+            var path = Environment.GetEnvironmentVariable("PATH") ?? "";
+            var extras = new[]
+            {
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "dotnet"),
+                Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Microsoft", "dotnet"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
+                    "WindowsPowerShell", "v1.0"),
+            };
+            var prefix = string.Join(Path.PathSeparator, extras.Where(Directory.Exists));
+            if (string.IsNullOrEmpty(prefix))
+                return;
+            psi.Environment["PATH"] = prefix + Path.PathSeparator + path;
+        }
+        catch
+        {
+            // best-effort
+        }
+    }
+
     private static string TrimDetail(string raw)
     {
         var t = raw.Trim();
@@ -218,18 +364,70 @@ $r2 = Invoke-WebRequest -Uri 'http://127.0.0.1:11434/api/tags' -UseBasicParsing 
         return t[^400..];
     }
 
-    private static string? FindRepoRoot()
+    /// <summary>
+    /// Resolve checkout that contains ALLSTART.ps1 / SoulCore/.env.
+    /// Order: configured path → HOUSE_SOULCORE_REPO → walk from BaseDirectory → common user folders.
+    /// </summary>
+    public static string? ResolveRepoRoot(string? configuredRepoRoot = null)
     {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        for (var i = 0; i < 10 && dir is not null; i++, dir = dir.Parent)
+        foreach (var candidate in EnumerateRepoRootCandidates(configuredRepoRoot))
         {
-            var allstart = Path.Combine(dir.FullName, "ALLSTART.ps1");
-            var soulEnv = Path.Combine(dir.FullName, "SoulCore", ".env");
-            if (File.Exists(allstart) || File.Exists(soulEnv))
-                return dir.FullName;
+            if (LooksLikeRepoRoot(candidate))
+                return Path.GetFullPath(candidate);
         }
 
         return null;
+    }
+
+    public static IEnumerable<string> EnumerateRepoRootCandidates(string? configuredRepoRoot = null)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredRepoRoot))
+            yield return configuredRepoRoot.Trim().Trim('"');
+
+        var env = Environment.GetEnvironmentVariable(RepoRootEnvName);
+        if (!string.IsNullOrWhiteSpace(env))
+            yield return env.Trim().Trim('"');
+
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        for (var i = 0; i < 12 && dir is not null; i++, dir = dir.Parent)
+            yield return dir.FullName;
+
+        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrWhiteSpace(profile))
+        {
+            foreach (var name in new[]
+                     {
+                         "Soul_Core",
+                         "SoulCore.AI",
+                         "SoulCore",
+                         Path.Combine("Documents", "Soul_Core"),
+                         Path.Combine("Documents", "SoulCore.AI"),
+                         Path.Combine("source", "SoulCore.AI"),
+                         Path.Combine("src", "SoulCore.AI"),
+                     })
+            {
+                yield return Path.Combine(profile, name);
+            }
+        }
+    }
+
+    public static bool LooksLikeRepoRoot(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return false;
+        try
+        {
+            if (!Directory.Exists(path))
+                return false;
+            var allstart = Path.Combine(path, "ALLSTART.ps1");
+            var soulEnv = Path.Combine(path, "SoulCore", ".env");
+            var hostCsproj = Path.Combine(path, "SoulCore", "SoulCore.Host", "SoulCore.Host.csproj");
+            return File.Exists(allstart) || File.Exists(soulEnv) || File.Exists(hostCsproj);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public void Dispose() => _http.Dispose();
@@ -239,4 +437,17 @@ public readonly record struct LocalStackActionResult(bool Ok, string Detail)
 {
     public static LocalStackActionResult Succeed(string detail) => new(true, detail);
     public static LocalStackActionResult Fail(string detail) => new(false, detail);
+}
+
+public readonly record struct LocalStackEnsureResult(
+    bool Ok,
+    bool HostStarted,
+    bool OllamaStarted,
+    string Detail)
+{
+    public static LocalStackEnsureResult Succeed(bool hostStarted, bool ollamaStarted, string detail) =>
+        new(true, hostStarted, ollamaStarted, detail);
+
+    public static LocalStackEnsureResult Fail(string detail) =>
+        new(false, false, false, detail);
 }
