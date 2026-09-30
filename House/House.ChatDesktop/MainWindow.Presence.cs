@@ -1201,10 +1201,8 @@ public partial class MainWindow
         {
             ConnDot.Fill = _okBrush;
             ConnStatusText.Text = $"Presence · {wsLabel}";
-            return;
         }
-
-        if (snap.Alive && snap.Warm)
+        else if (snap.Alive && snap.Warm)
         {
             ConnDot.Fill = _okBrush;
             ConnStatusText.Text = $"Alive · Warm · {wsLabel}";
@@ -1219,6 +1217,8 @@ public partial class MainWindow
             ConnDot.Fill = _badBrush;
             ConnStatusText.Text = $"Offline · {wsLabel}";
         }
+
+        RefreshBuildVersionChrome(snap.HostVersion);
     }
 
     private void OnWsStateChanged(WsConnectionState state, string detail)

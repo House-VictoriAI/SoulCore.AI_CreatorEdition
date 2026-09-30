@@ -14,6 +14,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>soulcore-host-phase0-dev</UserSecretsId>
+    <!-- Bump with House/scripts/bump-versions.ps1 (-Target host) on every Host fix. -->
+    <Version>0.1.1</Version>
+    <InformationalVersion>0.1.1</InformationalVersion>
+    <Product>SoulCore Host</Product>
+    <Company>LinearThrone</Company>
   </PropertyGroup>
 
   <ItemGroup>
