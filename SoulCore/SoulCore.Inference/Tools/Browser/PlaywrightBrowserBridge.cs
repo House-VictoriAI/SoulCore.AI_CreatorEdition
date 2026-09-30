@@ -457,7 +457,7 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
 
     private static readonly string[] LoginLabelAliases =
     {
-        "Log in", "Login", "Sign in", "Sign In", "Log In", "Continue", "Submit"
+        "Log in", "Login", "Sign in", "Sign In", "Log In"
     };
 
     public static bool IsLoginFamilyLabel(string label)
