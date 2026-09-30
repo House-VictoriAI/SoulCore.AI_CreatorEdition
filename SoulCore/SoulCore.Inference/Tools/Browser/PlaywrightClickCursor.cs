@@ -21,21 +21,22 @@ public static class PlaywrightClickCursor
           el.style.cssText = [
             'position:fixed',
             'z-index:2147483647',
-            'width:28px',
-            'height:28px',
-            'margin:-14px 0 0 -14px',
+            'width:36px',
+            'height:36px',
+            'margin:-18px 0 0 -18px',
             'border:3px solid #ff2d55',
             'border-radius:50%',
-            'background:rgba(255,45,85,0.35)',
-            'box-shadow:0 0 0 2px #fff, 0 0 14px rgba(255,45,85,0.9)',
+            'background:rgba(255,45,85,0.45)',
+            'box-shadow:0 0 0 3px #fff, 0 0 18px rgba(255,45,85,0.95)',
             'pointer-events:none',
             'left:-100px',
             'top:-100px',
-            'transition:left 40ms linear, top 40ms linear, transform 120ms ease',
+            'opacity:1',
+            'transition:left 50ms linear, top 50ms linear, transform 150ms ease, opacity 80ms linear',
             'transform:scale(1)'
           ].join(';');
           const ring = document.createElement('div');
-          ring.style.cssText = 'position:absolute;left:50%;top:50%;width:2px;height:2px;margin:-1px 0 0 -1px;background:#fff;border-radius:50%;';
+          ring.style.cssText = 'position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;background:#fff;border-radius:50%;box-shadow:0 0 0 1px #ff2d55';
           el.appendChild(ring);
           const mount = () => {
             if (!document.documentElement.contains(el))
@@ -45,10 +46,11 @@ public static class PlaywrightClickCursor
           new MutationObserver(mount).observe(document.documentElement, { childList: true });
           window.__scShowClick = (x, y) => {
             mount();
+            el.style.opacity = '1';
             el.style.left = Math.round(x) + 'px';
             el.style.top = Math.round(y) + 'px';
-            el.style.transform = 'scale(1.55)';
-            setTimeout(() => { el.style.transform = 'scale(1)'; }, 180);
+            el.style.transform = 'scale(1.7)';
+            setTimeout(() => { el.style.transform = 'scale(1)'; }, 220);
           };
         })();
         """;

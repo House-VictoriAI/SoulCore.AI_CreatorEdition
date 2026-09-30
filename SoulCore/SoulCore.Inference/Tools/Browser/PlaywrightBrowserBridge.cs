@@ -251,6 +251,19 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
             var titleBefore = await page.TitleAsync().ConfigureAwait(false);
 
             await target.ScrollIntoViewIfNeededAsync(new() { Timeout = 5_000 }).ConfigureAwait(false);
+            try
+            {
+                await target.WaitForAsync(new LocatorWaitForOptions
+                {
+                    State = WaitForSelectorState.Visible,
+                    Timeout = 8_000
+                }).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                // Still attempt click — some SPAs keep opacity tricks that confuse visibility.
+            }
+
             var box = await target.BoundingBoxAsync().ConfigureAwait(false);
             int? clickX = null;
             int? clickY = null;
@@ -258,12 +271,26 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
             {
                 clickX = (int)Math.Round(box.X + box.Width / 2);
                 clickY = (int)Math.Round(box.Y + box.Height / 2);
-                await ClickWithVisibleCursorAsync(page, clickX.Value, clickY.Value, ct).ConfigureAwait(false);
+                // Aim + publish so Presence shows the cursor, then locator-click (more reliable than mouse-only).
+                await AimVisibleCursorAsync(page, clickX.Value, clickY.Value, ct, $"aim '{label}'").ConfigureAwait(false);
             }
             else
             {
                 await EnsureClickCursorAsync(page).ConfigureAwait(false);
-                await target.ClickAsync(new LocatorClickOptions { Timeout = 15_000 }).ConfigureAwait(false);
+            }
+
+            var clicked = await TryLocatorClickAsync(target).ConfigureAwait(false);
+            if (!clicked && clickX is int mx && clickY is int my)
+            {
+                await page.Mouse.ClickAsync(mx, my).ConfigureAwait(false);
+                await page.WaitForTimeoutAsync(120).ConfigureAwait(false);
+            }
+            else if (!clicked)
+            {
+                return new BrowserBridgeResult(
+                    false,
+                    $"matched '{label}' as {how} but click did not land (not visible/enabled?). Call browser_snapshot.",
+                    new { text = label, nth = n, matched_as = how, action_ok = false, goal_complete = false, backend = BackendId });
             }
 
             // SPA/nav may not fire; settle briefly then compare URL/title so we don't pretend the next screen arrived.
@@ -325,10 +352,31 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
 
     /// <summary>
     /// Prefer real controls (button/link) over raw text nodes so clicks actually activate UI.
+    /// Exact role match first, then fuzzy; Login-family labels try Sign in / Log in aliases.
     /// </summary>
     internal static async Task<(ILocator Target, string How)?> ResolveClickableAsync(IPage page, string label, int nth)
     {
         var n = Math.Max(1, nth);
+        foreach (var candidate in ExpandClickLabels(label))
+        {
+            var hit = await TryResolveOneLabelAsync(page, candidate, n, exact: true).ConfigureAwait(false);
+            if (hit is not null)
+                return hit;
+        }
+
+        foreach (var candidate in ExpandClickLabels(label))
+        {
+            var hit = await TryResolveOneLabelAsync(page, candidate, n, exact: false).ConfigureAwait(false);
+            if (hit is not null)
+                return hit;
+        }
+
+        return null;
+    }
+
+    private static async Task<(ILocator Target, string How)?> TryResolveOneLabelAsync(
+        IPage page, string label, int n, bool exact)
+    {
         var roles = new[]
         {
             (AriaRole.Button, "button"),
@@ -339,20 +387,114 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
 
         foreach (var (role, how) in roles)
         {
-            var loc = page.GetByRole(role, new() { Name = label, Exact = false });
+            var loc = page.GetByRole(role, new() { Name = label, Exact = exact });
             var count = await loc.CountAsync().ConfigureAwait(false);
             if (count >= n)
                 return (loc.Nth(n - 1), how);
         }
 
-        // Clickable elements only — bare GetByText used to hit headings/labels and "succeed" with no UI change.
-        var clickable = page.Locator("button, a, [role='button'], [role='link'], input[type='submit'], input[type='button'], summary")
-            .Filter(new() { HasTextString = label });
-        var clickableCount = await clickable.CountAsync().ConfigureAwait(false);
-        if (clickableCount >= n)
-            return (clickable.Nth(n - 1), "clickable");
+        // Submit inputs often expose value=Login without an accessible name Playwright maps as Button.
+        var submit = page.Locator(
+            "input[type='submit'], input[type='button'], button[type='submit']");
+        var submitMatch = submit.Filter(new() { HasTextString = label });
+        var byValue = page.Locator(
+            $"input[type='submit'][value='{EscapeCssAttr(label)}'], input[type='button'][value='{EscapeCssAttr(label)}']");
+        foreach (var (loc, how) in new[] { (byValue, "submit"), (submitMatch, "submit") })
+        {
+            var count = await loc.CountAsync().ConfigureAwait(false);
+            if (count >= n)
+                return (loc.Nth(n - 1), how);
+        }
+
+        if (!exact)
+        {
+            // Case-insensitive value= match for Login / LOG IN style attributes.
+            var submits = page.Locator("input[type='submit'], input[type='button']");
+            var submitCount = await submits.CountAsync().ConfigureAwait(false);
+            var matched = 0;
+            for (var i = 0; i < submitCount; i++)
+            {
+                var el = submits.Nth(i);
+                var value = await el.GetAttributeAsync("value").ConfigureAwait(false);
+                if (value is null || value.IndexOf(label, StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+                matched++;
+                if (matched == n)
+                    return (el, "submit");
+            }
+
+            // Clickable elements only — bare GetByText used to hit headings/labels and "succeed" with no UI change.
+            var clickable = page.Locator(
+                    "button, a, [role='button'], [role='link'], input[type='submit'], input[type='button'], summary")
+                .Filter(new() { HasTextString = label });
+            var clickableCount = await clickable.CountAsync().ConfigureAwait(false);
+            if (clickableCount >= n)
+                return (clickable.Nth(n - 1), "clickable");
+        }
 
         return null;
+    }
+
+    /// <summary>Login / Sign in / Log in are the same family of controls on most sites.</summary>
+    public static IReadOnlyList<string> ExpandClickLabels(string label)
+    {
+        var t = (label ?? "").Trim();
+        if (t.Length == 0)
+            return Array.Empty<string>();
+
+        var list = new List<string> { t };
+        if (!IsLoginFamilyLabel(t))
+            return list;
+
+        foreach (var alias in LoginLabelAliases)
+        {
+            if (!list.Exists(x => string.Equals(x, alias, StringComparison.OrdinalIgnoreCase)))
+                list.Add(alias);
+        }
+
+        return list;
+    }
+
+    private static readonly string[] LoginLabelAliases =
+    {
+        "Log in", "Login", "Sign in", "Sign In", "Log In"
+    };
+
+    public static bool IsLoginFamilyLabel(string label)
+    {
+        var t = label.Trim().ToLowerInvariant();
+        return t is "login" or "log in" or "log-in" or "signin" or "sign in" or "sign-in"
+            or "logon" or "log on";
+    }
+
+    private static string EscapeCssAttr(string value) =>
+        value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "\\'", StringComparison.Ordinal);
+
+    private static async Task<bool> TryLocatorClickAsync(ILocator target)
+    {
+        try
+        {
+            await target.ClickAsync(new LocatorClickOptions { Timeout = 12_000 }).ConfigureAwait(false);
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            try
+            {
+                // Covered overlays / sticky headers — force as last locator attempt.
+                await target.ClickAsync(new LocatorClickOptions { Timeout = 5_000, Force = true })
+                    .ConfigureAwait(false);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
     }
 
     public static string FormatClickTextResult(
@@ -604,9 +746,15 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
         }
     }
 
-    private async Task ClickWithVisibleCursorAsync(IPage page, int x, int y, CancellationToken ct)
+    /// <summary>
+    /// Presence polls Her browser ~200ms — dwell must exceed several polls, and we publish a burn-in
+    /// aim frame BEFORE the click so Kayleigh can see the cursor while Victoria drives.
+    /// </summary>
+    public const int AimDwellMs = 650;
+
+    private async Task AimVisibleCursorAsync(
+        IPage page, int x, int y, CancellationToken ct, string actionLabel)
     {
-        _ = ct;
         await EnsureClickCursorAsync(page).ConfigureAwait(false);
         await page.Mouse.MoveAsync(x, y).ConfigureAwait(false);
         try
@@ -620,10 +768,16 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
             _log?.LogDebug(ex, "Playwright click cursor move failed");
         }
 
-        // Brief pause so Presence / headed window can show the aim point before the click.
-        await page.WaitForTimeoutAsync(140).ConfigureAwait(false);
+        // Publish aim frame with burn-in BEFORE click — overlay alone is easy to miss between polls.
+        await PublishFrameAsync(page, actionLabel, ct, clickX: x, clickY: y).ConfigureAwait(false);
+        await page.WaitForTimeoutAsync(AimDwellMs).ConfigureAwait(false);
+    }
+
+    private async Task ClickWithVisibleCursorAsync(IPage page, int x, int y, CancellationToken ct)
+    {
+        await AimVisibleCursorAsync(page, x, y, ct, $"aim ({x},{y})").ConfigureAwait(false);
         await page.Mouse.ClickAsync(x, y).ConfigureAwait(false);
-        await page.WaitForTimeoutAsync(80).ConfigureAwait(false);
+        await page.WaitForTimeoutAsync(120).ConfigureAwait(false);
     }
 
     private async Task<IPage> EnsurePageAsync(CancellationToken ct)

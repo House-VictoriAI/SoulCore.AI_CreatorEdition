@@ -231,13 +231,28 @@
           <Border x:Name="VictoriaBrowserPanel" Classes="metal glass" Padding="8" MinHeight="120">
             <Grid RowDefinitions="Auto,*,Auto">
               <TextBlock Text="Her browser" FontWeight="SemiBold" Margin="0,0,0,6"/>
-              <Border Grid.Row="1" Classes="carbon inset" ClipToBounds="True" MinHeight="90">
+              <Border Grid.Row="1" x:Name="VictoriaBrowserSurface" Classes="carbon inset" ClipToBounds="True" MinHeight="90"
+                      PointerMoved="VictoriaBrowserSurface_PointerMoved"
+                      PointerExited="VictoriaBrowserSurface_PointerExited"
+                      PointerPressed="VictoriaBrowserSurface_PointerPressed"
+                      ToolTip.Tip="Hover for Playwright click coords · click to copy">
                 <Grid>
                   <TextBlock x:Name="VictoriaBrowserEmptyText"
                              Text="No Playwright frame yet — clicks show a pink crosshair here"
                              Foreground="{DynamicResource MutedBrush}" FontSize="11" TextWrapping="Wrap"
                              Margin="10" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                  <Image x:Name="VictoriaBrowserImage" Stretch="Uniform" IsVisible="False"/>
+                  <Image x:Name="VictoriaBrowserImage" Stretch="Uniform" IsVisible="False"
+                         HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                  <Border x:Name="VictoriaBrowserCoordBadge" IsVisible="False"
+                          HorizontalAlignment="Left" VerticalAlignment="Top"
+                          Margin="8" Padding="8,4" CornerRadius="4"
+                          Background="#CC0A0A0A" BorderBrush="#FFFF2D55" BorderThickness="1"
+                          IsHitTestVisible="False">
+                    <TextBlock x:Name="VictoriaBrowserCoordText"
+                               FontSize="13" FontWeight="SemiBold"
+                               Foreground="#FFFF2D55"
+                               Text="click (0, 0)"/>
+                  </Border>
                 </Grid>
               </Border>
               <StackPanel Grid.Row="2" Margin="0,6,0,0" Spacing="2">
