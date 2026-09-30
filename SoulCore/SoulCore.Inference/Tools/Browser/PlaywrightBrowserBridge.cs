@@ -602,7 +602,13 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
             var page = await EnsurePageAsync(ct).ConfigureAwait(false);
             var bytes = await page.ScreenshotAsync(new PageScreenshotOptions { Type = ScreenshotType.Jpeg, Quality = 70 })
                 .ConfigureAwait(false);
-            _view?.Publish(bytes, page.Url, await page.TitleAsync().ConfigureAwait(false), reason);
+            _view?.Publish(
+                bytes,
+                page.Url,
+                await page.TitleAsync().ConfigureAwait(false),
+                reason,
+                waitingOnYou: null,
+                backend: VictoriaBrowserViewHub.BackendPlaywright);
             return new BrowserBridgeResult(
                 true,
                 $"playwright screenshot ({reason}) url={page.Url}",
@@ -640,7 +646,13 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
             if (clickX is int x && clickY is int y)
                 bytes = PlaywrightClickCursor.BurnInMarker(bytes, x, y);
             var title = await page.TitleAsync().ConfigureAwait(false);
-            _view.Publish(bytes, page.Url, title, action);
+            _view.Publish(
+                bytes,
+                page.Url,
+                title,
+                action,
+                waitingOnYou: null,
+                backend: VictoriaBrowserViewHub.BackendPlaywright);
         }
         catch (Exception ex)
         {

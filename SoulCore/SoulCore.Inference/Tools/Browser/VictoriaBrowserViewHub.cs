@@ -1,12 +1,19 @@
 namespace SoulCore.Inference.Tools.Browser;
 
 /// <summary>
-/// In-memory near-live view of Victoria's Playwright browser (FED-196).
-/// Loopback Host serves this — not persisted to the desktop screenshot gallery.
+/// In-memory near-live view for Presence "Her screen" (FED-196).
+/// Playwright Chromium or VirtualBox guest framebuffer — not persisted to the desktop gallery.
 /// </summary>
 public interface IVictoriaBrowserViewHub
 {
-    void Publish(byte[] jpegOrPng, string? url, string? title, string? lastAction, string? waitingOnYou = null);
+    void Publish(
+        byte[] jpegOrPng,
+        string? url,
+        string? title,
+        string? lastAction,
+        string? waitingOnYou = null,
+        string? backend = null);
+
     VictoriaBrowserViewSnapshot GetSnapshot();
     bool TryGetImageBytes(out byte[]? bytes, out string contentType);
 }
@@ -24,6 +31,9 @@ public sealed class VictoriaBrowserViewSnapshot
 
 public sealed class VictoriaBrowserViewHub : IVictoriaBrowserViewHub
 {
+    public const string BackendPlaywright = "playwright";
+    public const string BackendVboxGuest = "vbox-guest";
+
     private readonly object _gate = new();
     private byte[]? _bytes;
     private string _contentType = "image/jpeg";
@@ -31,9 +41,16 @@ public sealed class VictoriaBrowserViewHub : IVictoriaBrowserViewHub
     private string? _title;
     private string? _lastAction;
     private string? _waiting;
+    private string _backend = BackendPlaywright;
     private DateTimeOffset? _updated;
 
-    public void Publish(byte[] jpegOrPng, string? url, string? title, string? lastAction, string? waitingOnYou = null)
+    public void Publish(
+        byte[] jpegOrPng,
+        string? url,
+        string? title,
+        string? lastAction,
+        string? waitingOnYou = null,
+        string? backend = null)
     {
         if (jpegOrPng is null || jpegOrPng.Length == 0)
             return;
@@ -47,6 +64,8 @@ public sealed class VictoriaBrowserViewHub : IVictoriaBrowserViewHub
             if (title is not null) _title = title;
             if (lastAction is not null) _lastAction = lastAction;
             if (waitingOnYou is not null) _waiting = waitingOnYou;
+            if (!string.IsNullOrWhiteSpace(backend))
+                _backend = backend.Trim();
             _updated = DateTimeOffset.UtcNow;
         }
     }
@@ -62,6 +81,7 @@ public sealed class VictoriaBrowserViewHub : IVictoriaBrowserViewHub
                 Title = _title,
                 LastAction = _lastAction,
                 WaitingOnYou = _waiting,
+                Backend = _backend,
                 UpdatedUtc = _updated
             };
         }
@@ -75,5 +95,27 @@ public sealed class VictoriaBrowserViewHub : IVictoriaBrowserViewHub
             contentType = _contentType;
             return bytes is { Length: > 0 };
         }
+    }
+
+    /// <summary>
+    /// Publish guest / desktop tool image bytes into Her screen (same pixels as desktop_screenshot).
+    /// Hover coords on Presence then match guest framebuffer origin 0,0.
+    /// </summary>
+    public static bool TryPublishFromToolData(
+        IVictoriaBrowserViewHub? hub,
+        object? data,
+        string lastAction,
+        string backend = BackendVboxGuest,
+        string? url = null,
+        string? title = null)
+    {
+        if (hub is null || data is null)
+            return false;
+
+        if (!Desktop.DesktopViewHub.TryGetImageBytesFromToolData(data, out var bytes))
+            return false;
+
+        hub.Publish(bytes, url, title ?? "victoria-sandbox", lastAction, waitingOnYou: null, backend);
+        return true;
     }
 }

@@ -1,13 +1,14 @@
 namespace House.ChatDesktop.Services;
 
 /// <summary>
-/// Maps pointer position over a Uniform-stretched Playwright frame to page pixel coords
-/// Kayleigh can give Victoria for <c>browser_click</c>.
+/// Maps pointer position over a Uniform-stretched Her-screen frame to pixel coords
+/// Kayleigh can give Victoria for <c>desktop_click</c> / <c>browser_click</c>
+/// (guest framebuffer or Playwright page pixels).
 /// </summary>
 public static class VictoriaBrowserCoordMap
 {
     /// <summary>
-    /// Returns page (x,y) when the pointer is over the letterboxed image; otherwise null.
+    /// Returns page/framebuffer (x,y) when the pointer is over the letterboxed image; otherwise null.
     /// </summary>
     public static (int X, int Y)? TryMapPointerToPage(
         double pointerX,

@@ -225,22 +225,22 @@
         <GridSplitter x:Name="PresenceColumnSplitter" Grid.Column="1" Width="4"
                       ResizeDirection="Columns" ShowsPreview="False"
                       Background="#33FFFFFF" MinWidth="4"
-                      ToolTip.Tip="Drag to resize chat vs Her browser"/>
+                      ToolTip.Tip="Drag to resize chat vs Her screen"/>
 
         <Grid x:Name="PresenceSideSplit" Grid.Column="2" MinWidth="200"
               RowDefinitions="*,4,200">
           <!-- row 2 height restored from LocalUiSettings; GridSplitter adjusts vs Her browser -->
           <Border x:Name="VictoriaBrowserPanel" Classes="metal glass" Padding="8" MinHeight="120">
             <Grid RowDefinitions="Auto,*,Auto">
-              <TextBlock Text="Her browser" FontWeight="SemiBold" Margin="0,0,0,6"/>
+              <TextBlock Text="Her screen" FontWeight="SemiBold" Margin="0,0,0,6"/>
               <Border Grid.Row="1" x:Name="VictoriaBrowserSurface" Classes="carbon inset" ClipToBounds="True" MinHeight="90"
                       PointerMoved="VictoriaBrowserSurface_PointerMoved"
                       PointerExited="VictoriaBrowserSurface_PointerExited"
                       PointerPressed="VictoriaBrowserSurface_PointerPressed"
-                      ToolTip.Tip="Hover for Playwright click coords · click to copy">
+                      ToolTip.Tip="Hover for guest click coords · click to copy for desktop_click">
                 <Grid>
                   <TextBlock x:Name="VictoriaBrowserEmptyText"
-                             Text="No Playwright frame yet — clicks show a pink crosshair here"
+                             Text="No VirtualBox frame yet — ask her to screenshot; hover for guest coords"
                              Foreground="{DynamicResource MutedBrush}" FontSize="11" TextWrapping="Wrap"
                              Margin="10" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                   <Image x:Name="VictoriaBrowserImage" Stretch="Uniform" IsVisible="False"
@@ -274,7 +274,7 @@
                         ResizeDirection="Rows" ShowsPreview="False"
                         Background="#33FFFFFF" MinHeight="4"
                         HorizontalAlignment="Stretch"
-                        ToolTip.Tip="Drag to resize Her browser vs What she saw"/>
+                        ToolTip.Tip="Drag to resize Her screen vs What she saw"/>
 
           <!-- PROP-4 sight: frame + stamp + folder only (PROP-12.1: height via splitter) -->
           <Border x:Name="ScreenPanel" Grid.Row="2" Classes="metal glass" Padding="8" MinHeight="120">

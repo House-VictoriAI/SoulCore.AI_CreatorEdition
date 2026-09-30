@@ -148,7 +148,8 @@ internal static class ToolsServiceCollectionExtensions
         services.AddSingleton<ITool>(sp => new DesktopScreenshotTool(
             sp.GetRequiredService<IComputerControlGate>(),
             sp.GetRequiredService<IDesktopControlBackend>(),
-            sp.GetRequiredService<IDesktopViewHub>()));
+            sp.GetRequiredService<IDesktopViewHub>(),
+            sp.GetRequiredService<IVictoriaBrowserViewHub>()));
         services.AddSingleton<ITool, DesktopClickTool>();
         services.AddSingleton<ITool, DesktopDragTool>();
         services.AddSingleton<ITool, DesktopTypeTool>();
@@ -233,7 +234,8 @@ internal static class ToolsServiceCollectionExtensions
         services.AddSingleton<ITool>(sp => new BrowserCaptureTabTool(
             sp.GetRequiredService<IBrowserBridge>(),
             sp.GetRequiredService<IToolsAccessSettings>(),
-            sp.GetRequiredService<IDesktopViewHub>()));
+            sp.GetRequiredService<IDesktopViewHub>(),
+            sp.GetRequiredService<IVictoriaBrowserViewHub>()));
         services.AddSingleton<ITool, BrowserNavigateTool>();
         services.AddSingleton<ITool, BrowserSnapshotTool>();
         services.AddSingleton<ITool, BrowserClickTextTool>();

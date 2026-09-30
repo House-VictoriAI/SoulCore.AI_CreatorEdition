@@ -461,7 +461,7 @@ internal static class WebApplicationExtensions
             return Results.File(bytes, contentType);
         });
 
-        // FED-196 / BED-195: near-live Victoria Playwright browser (in-memory; not gallery).
+        // FED-196: near-live Victoria screen (Playwright Chromium or VirtualBox guest framebuffer).
         app.MapGet("/browser/view", (IVictoriaBrowserViewHub view) =>
         {
             var snap = view.GetSnapshot();
@@ -475,7 +475,9 @@ internal static class WebApplicationExtensions
                 waitingOnYou = snap.WaitingOnYou,
                 backend = snap.Backend,
                 updatedAt = snap.UpdatedUtc,
-                note = "Victoria's dedicated Playwright Chromium (not Kayleigh's Chrome). In-memory stream only — not written to desktop screenshot gallery."
+                note = snap.Backend == VictoriaBrowserViewHub.BackendVboxGuest
+                    ? "VirtualBox guest framebuffer (victoria-sandbox). Hover coords = guest origin 0,0 for desktop_click. In-memory only."
+                    : "Victoria's dedicated Playwright Chromium (not Kayleigh's Chrome). In-memory stream only — not written to desktop screenshot gallery."
             });
         });
 

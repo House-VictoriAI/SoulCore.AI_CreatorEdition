@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using SoulCore.Config;
 using SoulCore.Inference.Clients;
 using SoulCore.Inference.Tooling;
+using SoulCore.Inference.Tools.Browser;
 using SoulCore.Inference.Tools.Desktop;
 
 namespace SoulCore.Protocol.Tests;
@@ -300,6 +301,35 @@ public class DesktopToolsTests
     }
 
     [Fact]
+    public async Task DesktopScreenshot_PublishesGuestFrame_ToHerScreenHub()
+    {
+        var png = MinimalPng(8, 6);
+        var backend = new MockDesktopBackend
+        {
+            ScreenshotResult = new DesktopOpResult(
+                true,
+                "guest screenshot",
+                new { bytes = png, width = 8, height = 6, format = "png" }),
+        };
+        var gate = new ComputerControlGate(allowDesktopCapture: true, allowComputerControl: false);
+        var desk = new DesktopViewHub();
+        var her = new VictoriaBrowserViewHub();
+        var tool = new DesktopScreenshotTool(gate, backend, desk, her);
+
+        var result = await tool.ExecuteAsync(JsonDocument.Parse("""{}""").RootElement);
+
+        Assert.True(result.Success);
+        var snap = her.GetSnapshot();
+        Assert.True(snap.HasImage);
+        Assert.Equal(VictoriaBrowserViewHub.BackendVboxGuest, snap.Backend);
+        Assert.Equal("desktop_screenshot", snap.LastAction);
+        Assert.True(her.TryGetImageBytes(out var bytes, out var ct));
+        Assert.NotNull(bytes);
+        Assert.Equal(png.Length, bytes!.Length);
+        Assert.Equal("image/png", ct);
+    }
+
+    [Fact]
     public async Task DesktopScreenshot_CaptureDisabled_Refuses()
     {
         var backend = new MockDesktopBackend();
@@ -574,4 +604,19 @@ public class DesktopToolsTests
         }
     }
 
+    /// <summary>PNG signature + IHDR so size readers and Her-screen hub treat it as png.</summary>
+    private static byte[] MinimalPng(int width, int height)
+    {
+        var w = BitConverter.GetBytes(System.Net.IPAddress.HostToNetworkOrder(width));
+        var h = BitConverter.GetBytes(System.Net.IPAddress.HostToNetworkOrder(height));
+        var buf = new byte[33];
+        buf[0] = 0x89; buf[1] = 0x50; buf[2] = 0x4E; buf[3] = 0x47;
+        buf[4] = 0x0D; buf[5] = 0x0A; buf[6] = 0x1A; buf[7] = 0x0A;
+        buf[11] = 13;
+        buf[12] = (byte)'I'; buf[13] = (byte)'H'; buf[14] = (byte)'D'; buf[15] = (byte)'R';
+        Buffer.BlockCopy(w, 0, buf, 16, 4);
+        Buffer.BlockCopy(h, 0, buf, 20, 4);
+        buf[24] = 8; buf[25] = 2;
+        return buf;
+    }
 }
