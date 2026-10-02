@@ -28,10 +28,14 @@ public partial class MainWindow
             _layoutReady = true;
             // Re-apply after first measure so ActualWidth/Height mins stick.
             ApplyStoredPaneSizes();
+            // Frameless transparent window off a disconnected monitor = "starts then nothing".
+            EnsureWindowOnScreen();
+            PresenceStartupLog.Write(
+                $"MainWindow opened at {Position.X},{Position.Y} size {Width}x{Height} state={WindowState}");
         };
         Closing += (_, _) => PersistLayoutNow();
         PropertyChanged += MainWindow_LayoutPropertyChanged;
-        // Window.Position is a CLR property (not AvaloniaProperty) — use PositionChanged.
+        // Window.Position is a CLR property (not AvaloniaProperty) - use PositionChanged.
         PositionChanged += (_, _) => ScheduleLayoutSave();
     }
 
@@ -76,12 +80,26 @@ public partial class MainWindow
             MinWidth = LocalUiSettings.MinWindowWidth;
             MinHeight = LocalUiSettings.MinWindowHeight;
 
-            if (_uiSettings.WindowX is double x && _uiSettings.WindowY is double y
-                && !double.IsNaN(x) && !double.IsNaN(y))
+            // Screens may be empty before the window handle exists; Opened re-checks.
+            var areas = CollectScreenWorkingAreas();
+            var (pos, relocated) = PresenceWindowPlacement.ResolveStartPosition(
+                _uiSettings.WindowX,
+                _uiSettings.WindowY,
+                Width,
+                Height,
+                areas);
+
+            if (pos is PixelPoint safe)
             {
-                // Position after first layout pass is safer; set immediately for cold start.
-                Position = new PixelPoint((int)Math.Round(x), (int)Math.Round(y));
+                Position = safe;
                 WindowStartupLocation = WindowStartupLocation.Manual;
+                if (relocated)
+                {
+                    PresenceStartupLog.Write(
+                        $"Saved window position off-screen; moved to {safe.X},{safe.Y}");
+                    _uiSettings.WindowX = safe.X;
+                    _uiSettings.WindowY = safe.Y;
+                }
             }
 
             if (_uiSettings.WindowMaximized)
@@ -90,6 +108,61 @@ public partial class MainWindow
         finally
         {
             _applyingLayout = false;
+        }
+    }
+
+    private void EnsureWindowOnScreen()
+    {
+        if (WindowState == WindowState.Maximized || WindowState == WindowState.FullScreen)
+            return;
+
+        var areas = CollectScreenWorkingAreas();
+        if (areas.Count == 0)
+            return;
+
+        var size = PixelSize.FromSize(ClientSize, DesktopScaling);
+        if (size.Width <= 0 || size.Height <= 0)
+            size = new PixelSize((int)Math.Round(Width), (int)Math.Round(Height));
+
+        var bounds = new PixelRect(Position, size);
+        if (PresenceWindowPlacement.IntersectsAnyScreen(bounds, areas)
+            && PresenceWindowPlacement.IsPointOnAnyScreen(Position.X, Position.Y, areas))
+            return;
+
+        _applyingLayout = true;
+        try
+        {
+            var pos = PresenceWindowPlacement.CenterOnPrimary(size, areas);
+            Position = pos;
+            _uiSettings.WindowX = pos.X;
+            _uiSettings.WindowY = pos.Y;
+            PresenceStartupLog.Write($"EnsureWindowOnScreen relocated to {pos.X},{pos.Y}");
+            try { _uiSettings.Save(); }
+            catch { /* ignore */ }
+        }
+        finally
+        {
+            _applyingLayout = false;
+        }
+    }
+
+    private IReadOnlyList<PixelRect> CollectScreenWorkingAreas()
+    {
+        try
+        {
+            var screens = Screens?.All;
+            if (screens is null || screens.Count == 0)
+                return Array.Empty<PixelRect>();
+
+            var list = new List<PixelRect>(screens.Count);
+            foreach (var screen in screens)
+                list.Add(screen.WorkingArea);
+            return list;
+        }
+        catch (Exception ex)
+        {
+            PresenceStartupLog.WriteException("CollectScreenWorkingAreas", ex);
+            return Array.Empty<PixelRect>();
         }
     }
 

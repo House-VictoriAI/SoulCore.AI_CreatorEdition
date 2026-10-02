@@ -96,7 +96,9 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        PresenceStartupLog.Write("MainWindow ctor begin");
         InitializeComponent();
+        PresenceStartupLog.Write("InitializeComponent done");
         TranscriptList.ItemsSource = _messages;
         EndpointText.Text = ConnectionDefaults.DisplayEndpoint;
         DisplayNameBox.Text = _uiSettings.DisplayName;

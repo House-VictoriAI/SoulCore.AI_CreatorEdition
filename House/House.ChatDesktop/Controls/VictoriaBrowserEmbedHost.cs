@@ -45,22 +45,31 @@ public sealed class VictoriaBrowserEmbedHost : NativeControlHost
         if (!OperatingSystem.IsWindows() || _hwnd == 0 || parent.Handle == 0)
             return base.CreateNativeControlCore(parent);
 
-        _previousParent = GetParent(_hwnd);
-        // CHILD style so layout lives inside Presence; keep visible.
-var originalStyle = GetWindowLong(_hwnd, GWL_STYLE);
-        var childStyle = (originalStyle | WS_CHILD | WS_VISIBLE) & ~WS_POPUP;
-        _ = SetWindowLong(_hwnd, GWL_STYLE, childStyle);
-
-        Marshal.SetLastPInvokeError(0);
-        if (SetParent(_hwnd, parent.Handle) == 0 && Marshal.GetLastPInvokeError() != 0)
+        try
         {
-            _ = SetWindowLong(_hwnd, GWL_STYLE, originalStyle);
+            _previousParent = GetParent(_hwnd);
+            // CHILD style so layout lives inside Presence; keep visible.
+            var originalStyle = GetWindowLong(_hwnd, GWL_STYLE);
+            var childStyle = (originalStyle | WS_CHILD | WS_VISIBLE) & ~WS_POPUP;
+            _ = SetWindowLong(_hwnd, GWL_STYLE, childStyle);
+
+            Marshal.SetLastPInvokeError(0);
+            if (SetParent(_hwnd, parent.Handle) == 0 && Marshal.GetLastPInvokeError() != 0)
+            {
+                _ = SetWindowLong(_hwnd, GWL_STYLE, originalStyle);
+                return base.CreateNativeControlCore(parent);
+            }
+
+            _attached = true;
+            ResizeToHost(parent.Handle);
+            return new PlatformHandle(_hwnd, "HWND");
+        }
+        catch
+        {
+            // Never take down Presence for a bad Chromium HWND — JPEG fallback stays.
+            _attached = false;
             return base.CreateNativeControlCore(parent);
         }
-
-        _attached = true;
-        ResizeToHost(parent.Handle);
-        return new PlatformHandle(_hwnd, "HWND");
     }
 
     protected override void DestroyNativeControlCore(IPlatformHandle control)
