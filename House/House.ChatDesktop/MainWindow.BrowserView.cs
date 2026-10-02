@@ -10,6 +10,8 @@ public partial class MainWindow
     private int _browserImagePixelWidth;
     private int _browserImagePixelHeight;
     private string? _lastHoverClickHint;
+    private long _lastEmbedHwnd;
+    private string? _lastEmbedMode;
 
     private async Task RefreshVictoriaBrowserViewAsync()
     {
@@ -20,7 +22,10 @@ public partial class MainWindow
         try
         {
             var snap = await _browserView.GetAsync(includeImage: true).ConfigureAwait(true);
-            ApplyVictoriaBrowserView(snap);
+            BrowserEmbedSnapshot? embed = null;
+            if (snap.EmbedPane && OperatingSystem.IsWindows())
+                embed = await _browserView.GetEmbedAsync().ConfigureAwait(true);
+            ApplyVictoriaBrowserView(snap, embed);
         }
         finally
         {
@@ -28,7 +33,7 @@ public partial class MainWindow
         }
     }
 
-    private void ApplyVictoriaBrowserView(BrowserViewSnapshot snap)
+    private void ApplyVictoriaBrowserView(BrowserViewSnapshot snap, BrowserEmbedSnapshot? embed = null)
     {
         if (VictoriaBrowserActionText is null) return;
 
@@ -44,6 +49,7 @@ public partial class MainWindow
             }
 
             ClearVictoriaBrowserImage();
+            ClearVictoriaBrowserEmbed("Host unreachable");
             return;
         }
 
@@ -53,16 +59,28 @@ public partial class MainWindow
             VictoriaBrowserTitleText.Text = snap.Title ?? "";
 
         var when = snap.UpdatedAt?.ToLocalTime().ToString("h:mm:ss tt") ?? "-";
+        var embedded = embed is { Mode: "embedded", Hwnd: > 0 } && OperatingSystem.IsWindows();
+        var modeLabel = embedded
+            ? "embedded"
+            : embed?.Mode is { Length: > 0 } m && m != "disabled"
+                ? m
+                : (snap.Backend ?? "playwright");
+
         VictoriaBrowserActionText.Text = string.IsNullOrWhiteSpace(snap.LastAction)
-            ? $"No frame yet · {snap.Backend ?? "vbox-guest"} · {when}"
-            : $"{snap.LastAction} · {snap.Backend ?? "vbox-guest"} · {when}";
+            ? $"No frame yet · {modeLabel} · {when}"
+            : $"{snap.LastAction} · {modeLabel} · {when}";
 
         if (VictoriaBrowserWaitingText is not null)
         {
             var waiting = snap.WaitingOnYou?.Trim();
-            if (!string.IsNullOrWhiteSpace(waiting))
+            var embedNote = embed?.Mode is "fallback" or "capture_off"
+                ? embed.Detail
+                : null;
+            if (!string.IsNullOrWhiteSpace(waiting) || !string.IsNullOrWhiteSpace(embedNote))
             {
-                VictoriaBrowserWaitingText.Text = "Waiting on you: " + waiting;
+                VictoriaBrowserWaitingText.Text = !string.IsNullOrWhiteSpace(waiting)
+                    ? "Waiting on you: " + waiting
+                    : "Embed: " + embedNote;
                 VictoriaBrowserWaitingText.IsVisible = true;
             }
             else
@@ -72,6 +90,19 @@ public partial class MainWindow
             }
         }
 
+        if (embedded)
+        {
+            ApplyVictoriaBrowserEmbed(embed!);
+            // Hide JPEG while HWND is live — coord hover is for JPEG fallback only.
+            if (VictoriaBrowserImage is not null)
+                VictoriaBrowserImage.IsVisible = false;
+            if (VictoriaBrowserEmptyText is not null)
+                VictoriaBrowserEmptyText.IsVisible = false;
+            HideVictoriaBrowserCoords();
+            return;
+        }
+
+        ClearVictoriaBrowserEmbed(embed?.Detail);
         if (snap.ImageBytes is { Length: > 0 })
         {
             var hash = $"{snap.ImageBytes.Length}:{snap.UpdatedAt:O}:{snap.Url}";
@@ -85,6 +116,26 @@ public partial class MainWindow
         {
             ClearVictoriaBrowserImage();
         }
+    }
+
+    private void ApplyVictoriaBrowserEmbed(BrowserEmbedSnapshot embed)
+    {
+        if (VictoriaBrowserEmbedHost is null)
+            return;
+
+        if (embed.Hwnd == _lastEmbedHwnd && string.Equals(_lastEmbedMode, embed.Mode, StringComparison.Ordinal))
+            return;
+
+        _lastEmbedHwnd = embed.Hwnd;
+        _lastEmbedMode = embed.Mode;
+        VictoriaBrowserEmbedHost.Bind((nint)embed.Hwnd);
+    }
+
+    private void ClearVictoriaBrowserEmbed(string? detail)
+    {
+        _lastEmbedHwnd = 0;
+        _lastEmbedMode = detail;
+        VictoriaBrowserEmbedHost?.Bind(0);
     }
 
     private void ShowVictoriaBrowserBitmap(byte[] imageBytes)

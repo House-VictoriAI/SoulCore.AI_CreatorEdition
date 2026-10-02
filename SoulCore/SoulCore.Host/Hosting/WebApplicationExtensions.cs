@@ -462,9 +462,10 @@ internal static class WebApplicationExtensions
         });
 
         // FED-196: near-live Victoria screen (Playwright Chromium or VirtualBox guest framebuffer).
-        app.MapGet("/browser/view", (IVictoriaBrowserViewHub view) =>
+        app.MapGet("/browser/view", (IVictoriaBrowserViewHub view, IOptions<ToolsOptions> tools) =>
         {
             var snap = view.GetSnapshot();
+            var embed = tools.Value.PlaywrightEmbedPane;
             return Results.Json(new
             {
                 hasImage = snap.HasImage,
@@ -475,9 +476,12 @@ internal static class WebApplicationExtensions
                 waitingOnYou = snap.WaitingOnYou,
                 backend = snap.Backend,
                 updatedAt = snap.UpdatedUtc,
+                embedPane = embed,
                 note = snap.Backend == VictoriaBrowserViewHub.BackendVboxGuest
                     ? "VirtualBox guest framebuffer (victoria-sandbox). Hover coords = guest origin 0,0 for desktop_click. In-memory only."
-                    : "Victoria's dedicated Playwright Chromium (not Kayleigh's Chrome). In-memory stream only — not written to desktop screenshot gallery."
+                    : embed
+                        ? "PROP-14: Prefer HWND embed via GET /browser/embed; JPEG is fallback only."
+                        : "Victoria's dedicated Playwright Chromium (not Kayleigh's Chrome). In-memory stream only — not written to desktop screenshot gallery."
             });
         });
 
@@ -486,6 +490,91 @@ internal static class WebApplicationExtensions
             if (!view.TryGetImageBytes(out var bytes, out var contentType) || bytes is null || bytes.Length == 0)
                 return Results.NotFound();
             return Results.File(bytes, contentType);
+        });
+
+        // PROP-14.2: Windows desk — expose Victoria Playwright Chromium HWND for Presence SetParent.
+        app.MapGet("/browser/embed", async (
+            IBrowserBridge bridge,
+            IOptions<ToolsOptions> tools,
+            IToolsAccessSettings access,
+            CancellationToken ct) =>
+        {
+            var opts = tools.Value;
+            if (!opts.PlaywrightEmbedPane)
+            {
+                return Results.Json(new
+                {
+                    mode = "disabled",
+                    hwnd = 0,
+                    pid = 0,
+                    title = (string?)null,
+                    detail = "PlaywrightEmbedPane is off. Set Tools:PlaywrightEmbedPane=true and restart Host."
+                });
+            }
+
+            if (!OperatingSystem.IsWindows())
+            {
+                return Results.Json(new
+                {
+                    mode = "fallback",
+                    hwnd = 0,
+                    pid = 0,
+                    title = (string?)null,
+                    detail = "HWND embed is Windows-only. Use JPEG /browser/view fallback."
+                });
+            }
+
+            if (!BrowserToolGate.IsCaptureAllowed(access))
+            {
+                return Results.Json(new
+                {
+                    mode = "capture_off",
+                    hwnd = 0,
+                    pid = 0,
+                    title = (string?)null,
+                    detail = "AllowBrowserCapture is false — refuse embed."
+                });
+            }
+
+            // Ensure headed Chromium is up so a window exists to reparent.
+            if (string.Equals(bridge.BackendName, PlaywrightBrowserBridge.BackendId, StringComparison.OrdinalIgnoreCase))
+            {
+                var health = await bridge.HealthAsync(ct).ConfigureAwait(false);
+                if (!health.Success)
+                {
+                    return Results.Json(new
+                    {
+                        mode = "fallback",
+                        hwnd = 0,
+                        pid = 0,
+                        title = (string?)null,
+                        detail = health.Content
+                    });
+                }
+            }
+
+            var found = VictoriaChromiumWindowLocator.TryFind();
+            if (found is null)
+            {
+                return Results.Json(new
+                {
+                    mode = "fallback",
+                    hwnd = 0,
+                    pid = 0,
+                    title = (string?)null,
+                    detail = "No ms-playwright Chromium HWND yet — JPEG fallback. Ensure PlaywrightHeaded/EmbedPane and a live page."
+                });
+            }
+
+            return Results.Json(new
+            {
+                mode = "embedded",
+                hwnd = found.Hwnd.ToInt64(),
+                pid = found.Pid,
+                title = found.Title,
+                exePath = found.ExePath,
+                detail = "Presence should SetParent this HWND into Her screen (no floating twin)."
+            });
         });
 
         app.MapGet("/", () => Results.Redirect("/health"));

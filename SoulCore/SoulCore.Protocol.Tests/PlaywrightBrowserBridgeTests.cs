@@ -150,22 +150,39 @@ public class PlaywrightBrowserBridgeTests
     }
 
     [Fact]
-    public void BurnInMarker_DrawsCrosshair_KeepsValidJpeg()
+    public void BurnInMarker_ClickState_UsesTealAccent()
     {
         using var img = new Image<Rgba32>(80, 60, new Rgba32(20, 20, 20));
         using var ms = new MemoryStream();
         img.Save(ms, new JpegEncoder { Quality = 80 });
         var original = ms.ToArray();
 
-        var marked = PlaywrightClickCursor.BurnInMarker(original, 40, 30);
-        Assert.True(marked.Length > 100);
+        var marked = PlaywrightClickCursor.BurnInMarker(
+            original, 40, 30, PlaywrightClickCursor.MarkerState.Click);
         using var loaded = Image.Load<Rgba32>(marked);
-        Assert.Equal(80, loaded.Width);
-        Assert.Equal(60, loaded.Height);
-        // Center / ring should no longer be flat dark gray after burn-in.
         var sample = loaded[40, 30 - 15];
-        Assert.True(sample.R > 100 || sample.B > 40 || sample.G > 40,
-            $"expected accent/white on ring, got {sample}");
+        // Teal #2ec4b6 → G and B elevated vs flat gray.
+        Assert.True(sample.G > 100 || sample.B > 100,
+            $"expected teal accent on ring, got {sample}");
+    }
+
+    [Fact]
+    public void InitScript_DefinesIdlePinkAndClickTeal()
+    {
+        Assert.Contains(PlaywrightClickCursor.IdleHex, PlaywrightClickCursor.InitScript, StringComparison.Ordinal);
+        Assert.Contains(PlaywrightClickCursor.ClickHex, PlaywrightClickCursor.InitScript, StringComparison.Ordinal);
+        Assert.Contains("__scShowClick", PlaywrightClickCursor.InitScript, StringComparison.Ordinal);
+        Assert.Contains("__scMoveCursor", PlaywrightClickCursor.InitScript, StringComparison.Ordinal);
+        Assert.Contains(PlaywrightClickCursor.FlashMs.ToString(), PlaywrightClickCursor.InitScript, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(@"C:\Users\x\AppData\Local\ms-playwright\chromium-1148\chrome-win\chrome.exe", true)]
+    [InlineData(@"C:\Program Files\Google\Chrome\Application\chrome.exe", false)]
+    [InlineData(@"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe", false)]
+    public void IsVictoriaPlaywrightChromium_FiltersOperatorBrowsers(string path, bool expected)
+    {
+        Assert.Equal(expected, VictoriaChromiumWindowLocator.IsVictoriaPlaywrightChromium(path));
     }
 
     [Fact]
