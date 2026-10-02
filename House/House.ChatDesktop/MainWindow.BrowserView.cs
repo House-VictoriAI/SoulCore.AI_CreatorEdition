@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media.Imaging;
+using House.ChatDesktop.Controls;
 using House.ChatDesktop.Services;
 
 namespace House.ChatDesktop;
@@ -12,6 +13,7 @@ public partial class MainWindow
     private string? _lastHoverClickHint;
     private long _lastEmbedHwnd;
     private string? _lastEmbedMode;
+    private VictoriaBrowserEmbedHost? _victoriaBrowserEmbedHost;
 
     private async Task RefreshVictoriaBrowserViewAsync()
     {
@@ -120,22 +122,65 @@ public partial class MainWindow
 
     private void ApplyVictoriaBrowserEmbed(BrowserEmbedSnapshot embed)
     {
-        if (VictoriaBrowserEmbedHost is null)
+        var host = EnsureVictoriaBrowserEmbedHost();
+        if (host is null)
             return;
+
+        if (host.NativeHostUnavailable)
+        {
+            if (VictoriaBrowserWaitingText is not null && string.IsNullOrWhiteSpace(VictoriaBrowserWaitingText.Text))
+            {
+                VictoriaBrowserWaitingText.Text = "Embed: native host unavailable — JPEG fallback";
+                VictoriaBrowserWaitingText.IsVisible = true;
+            }
+
+            return;
+        }
 
         if (embed.Hwnd == _lastEmbedHwnd && string.Equals(_lastEmbedMode, embed.Mode, StringComparison.Ordinal))
             return;
 
         _lastEmbedHwnd = embed.Hwnd;
         _lastEmbedMode = embed.Mode;
-        VictoriaBrowserEmbedHost.Bind((nint)embed.Hwnd);
+        if (VictoriaBrowserEmbedSlot is not null)
+            VictoriaBrowserEmbedSlot.IsVisible = true;
+        host.Bind((nint)embed.Hwnd);
+    }
+
+    private VictoriaBrowserEmbedHost? EnsureVictoriaBrowserEmbedHost()
+    {
+        if (_victoriaBrowserEmbedHost is not null)
+            return _victoriaBrowserEmbedHost;
+
+        if (VictoriaBrowserEmbedSlot is null || !OperatingSystem.IsWindows())
+            return null;
+
+        try
+        {
+            _victoriaBrowserEmbedHost = new VictoriaBrowserEmbedHost
+            {
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch,
+                IsVisible = false
+            };
+            VictoriaBrowserEmbedSlot.Children.Add(_victoriaBrowserEmbedHost);
+            PresenceStartupLog.Write("VictoriaBrowserEmbedHost created (deferred)");
+            return _victoriaBrowserEmbedHost;
+        }
+        catch (Exception ex)
+        {
+            PresenceStartupLog.WriteException("EnsureVictoriaBrowserEmbedHost", ex);
+            return null;
+        }
     }
 
     private void ClearVictoriaBrowserEmbed(string? detail)
     {
         _lastEmbedHwnd = 0;
         _lastEmbedMode = detail;
-        VictoriaBrowserEmbedHost?.Bind(0);
+        _victoriaBrowserEmbedHost?.Bind(0);
+        if (VictoriaBrowserEmbedSlot is not null)
+            VictoriaBrowserEmbedSlot.IsVisible = false;
     }
 
     private void ShowVictoriaBrowserBitmap(byte[] imageBytes)

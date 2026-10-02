@@ -2,18 +2,22 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;
+using House.ChatDesktop.Services;
 
 namespace House.ChatDesktop.Controls;
 
 /// <summary>
 /// PROP-14.2: hosts an existing Win32 HWND (Victoria Playwright Chromium) inside Presence.
 /// Non-Windows / zero hwnd → no native child (JPEG fallback stays visible).
+/// Requires Windows app.manifest with supportedOS (see House.ChatDesktop/app.manifest).
 /// </summary>
 public sealed class VictoriaBrowserEmbedHost : NativeControlHost
 {
     private nint _hwnd;
     private nint _previousParent;
     private bool _attached;
+    private bool _nativeHostUnavailable;
+    private nint _placeholderHwnd;
 
     public nint Hwnd
     {
@@ -21,8 +25,17 @@ public sealed class VictoriaBrowserEmbedHost : NativeControlHost
         set => Bind(value);
     }
 
+    /// <summary>True when Win32 child-host creation failed (missing manifest / OS). JPEG fallback only.</summary>
+    public bool NativeHostUnavailable => _nativeHostUnavailable;
+
     public void Bind(nint hwnd)
     {
+        if (_nativeHostUnavailable)
+        {
+            IsVisible = false;
+            return;
+        }
+
         if (_hwnd == hwnd && (_attached || hwnd == 0))
             return;
 
@@ -40,10 +53,26 @@ public sealed class VictoriaBrowserEmbedHost : NativeControlHost
         IsVisible = true;
     }
 
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        try
+        {
+            base.OnAttachedToVisualTree(e);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Avalonia Win32NativeControlHost.DumbWindow without supportedOS manifest.
+            MarkUnavailable(ex);
+        }
+    }
+
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
     {
-        if (!OperatingSystem.IsWindows() || _hwnd == 0 || parent.Handle == 0)
-            return base.CreateNativeControlCore(parent);
+        if (_nativeHostUnavailable || !OperatingSystem.IsWindows() || parent.Handle == 0)
+            return CreatePlaceholderHandle();
+
+        if (_hwnd == 0)
+            return CreatePlaceholderOrBase(parent);
 
         try
         {
@@ -57,25 +86,90 @@ public sealed class VictoriaBrowserEmbedHost : NativeControlHost
             if (SetParent(_hwnd, parent.Handle) == 0 && Marshal.GetLastPInvokeError() != 0)
             {
                 _ = SetWindowLong(_hwnd, GWL_STYLE, originalStyle);
-                return base.CreateNativeControlCore(parent);
+                return CreatePlaceholderOrBase(parent);
             }
 
             _attached = true;
             ResizeToHost(parent.Handle);
             return new PlatformHandle(_hwnd, "HWND");
         }
-        catch
+        catch (Exception ex)
         {
-            // Never take down Presence for a bad Chromium HWND — JPEG fallback stays.
+            PresenceStartupLog.WriteException("VictoriaBrowserEmbedHost.CreateNativeControlCore", ex);
             _attached = false;
+            return CreatePlaceholderOrBase(parent);
+        }
+    }
+
+    private IPlatformHandle CreatePlaceholderOrBase(IPlatformHandle parent)
+    {
+        try
+        {
             return base.CreateNativeControlCore(parent);
         }
+        catch (InvalidOperationException ex)
+        {
+            MarkUnavailable(ex);
+            return CreatePlaceholderHandle();
+        }
+    }
+
+    private IPlatformHandle CreatePlaceholderHandle()
+    {
+        // Zero handle: DestroyWindow is a no-op; never return the Avalonia parent HWND.
+        DestroyPlaceholder();
+        if (OperatingSystem.IsWindows())
+        {
+            // Message-only window — avoids destroying any real UI if Avalonia tears us down.
+            _placeholderHwnd = CreateWindowExW(
+                0,
+                "Static",
+                "",
+                WS_POPUP,
+                0, 0, 0, 0,
+                HWND_MESSAGE,
+                nint.Zero,
+                nint.Zero,
+                nint.Zero);
+        }
+
+        return new PlatformHandle(_placeholderHwnd, "HWND");
+    }
+
+    private void MarkUnavailable(Exception ex)
+    {
+        _nativeHostUnavailable = true;
+        _attached = false;
+        IsVisible = false;
+        PresenceStartupLog.WriteException("VictoriaBrowserEmbedHost unavailable — JPEG fallback only", ex);
     }
 
     protected override void DestroyNativeControlCore(IPlatformHandle control)
     {
         DetachIfNeeded();
-        // Do not destroy Chromium — only detach. Base would DestroyWindow the handle.
+        // Do not destroy Chromium — only detach.
+        if (control.Handle == _hwnd && _hwnd != 0)
+            return;
+
+        if (control.Handle == _placeholderHwnd && _placeholderHwnd != 0)
+        {
+            DestroyPlaceholder();
+            return;
+        }
+
+        if (control.Handle != 0 && control.Handle != _hwnd)
+        {
+            try { base.DestroyNativeControlCore(control); }
+            catch { /* ignore */ }
+        }
+    }
+
+    private void DestroyPlaceholder()
+    {
+        if (_placeholderHwnd == 0 || !OperatingSystem.IsWindows())
+            return;
+        _ = DestroyWindow(_placeholderHwnd);
+        _placeholderHwnd = 0;
     }
 
     protected override void OnSizeChanged(SizeChangedEventArgs e)
@@ -127,6 +221,7 @@ public sealed class VictoriaBrowserEmbedHost : NativeControlHost
     private const int WS_POPUP = unchecked((int)0x80000000);
     private const int WS_VISIBLE = 0x10000000;
     private const int SW_SHOW = 5;
+    private static readonly nint HWND_MESSAGE = new(-3);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT
@@ -154,4 +249,22 @@ public sealed class VictoriaBrowserEmbedHost : NativeControlHost
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(nint hWnd, int nCmdShow);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern nint CreateWindowExW(
+        int dwExStyle,
+        string lpClassName,
+        string lpWindowName,
+        int dwStyle,
+        int x,
+        int y,
+        int nWidth,
+        int nHeight,
+        nint hWndParent,
+        nint hMenu,
+        nint hInstance,
+        nint lpParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyWindow(nint hWnd);
 }
