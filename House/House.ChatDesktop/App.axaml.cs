@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using House.ChatDesktop.Services;
 
 namespace House.ChatDesktop;
 
@@ -10,9 +11,23 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        PresenceStartupLog.Write("Framework initialization completed");
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow();
+            try
+            {
+                PresenceStartupLog.Write("Creating MainWindow");
+                desktop.MainWindow = new MainWindow();
+                PresenceStartupLog.Write("MainWindow created");
+            }
+            catch (Exception ex)
+            {
+                PresenceStartupLog.WriteException("MainWindow ctor", ex);
+                PresenceStartupLog.ShowFatal(
+                    "House Victoria Presence failed to open",
+                    ex.Message);
+                throw;
+            }
         }
 
         base.OnFrameworkInitializationCompleted();

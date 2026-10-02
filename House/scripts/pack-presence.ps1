@@ -90,7 +90,11 @@ if ($LASTEXITCODE -ne 0) { throw 'vpk pack failed' }
 
 Write-Host ''
 Write-Host "Done. Installer folder: $releaseDir"
-Write-Host 'Run Setup.exe on the target PC. Then Presence Settings > Updates (or title Update) to check for newer releases.'
+Write-Host 'Installer file: HouseVictoria.Presence-win-Setup.exe (Velopack renames Setup.exe).'
+Write-Host 'IMPORTANT: Setup.exe is the INSTALLER - it installs, launches Presence once, then exits.'
+Write-Host 'If nothing appears, open Start Menu -> HouseVictoria.Presence (or House Victoria Presence),'
+Write-Host 'and check %LocalAppData%\HouseVictoria\presence-startup.log for a crash trail.'
+Write-Host 'Then Presence Settings > Updates (or title Update) to check for newer releases.'
 
 if ($Publish) {
   $gh = Get-Command gh -ErrorAction SilentlyContinue
