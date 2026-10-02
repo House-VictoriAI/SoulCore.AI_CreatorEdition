@@ -1,6 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:controls="using:House.ChatDesktop.Controls"
         x:Class="House.ChatDesktop.MainWindow"
         Title="House Victoria — Presence"
         Height="780" Width="1180"
@@ -246,9 +245,11 @@
                              Margin="10" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                   <Image x:Name="VictoriaBrowserImage" Stretch="Uniform" IsVisible="False"
                          HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-                  <controls:VictoriaBrowserEmbedHost x:Name="VictoriaBrowserEmbedHost"
-                             IsVisible="False"
-                             HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                  <!-- NativeControlHost is created only when embedding — cold start must not
+                       hit Win32 CreateWindowEx (needs app.manifest; still defer as belt/suspenders). -->
+                  <Panel x:Name="VictoriaBrowserEmbedSlot"
+                         IsVisible="False"
+                         HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                   <Border x:Name="VictoriaBrowserCoordBadge" IsVisible="False"
                           HorizontalAlignment="Left" VerticalAlignment="Top"
                           Margin="8" Padding="8,4" CornerRadius="4"

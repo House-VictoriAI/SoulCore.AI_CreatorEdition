@@ -2,18 +2,25 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform;
+using Avalonia.VisualTree;
+using House.ChatDesktop.Services;
 
 namespace House.ChatDesktop.Controls;
 
 /// <summary>
 /// PROP-14.2: hosts an existing Win32 HWND (Victoria Playwright Chromium) inside Presence.
 /// Non-Windows / zero hwnd → no native child (JPEG fallback stays visible).
+/// Requires Windows app.manifest with supportedOS (see House.ChatDesktop/app.manifest).
+/// Avalonia NativeControlHost creates a Win32 child on visual-tree attach even when
+/// IsVisible=False — never put this control in the tree until Bind has a real HWND.
 /// </summary>
 public sealed class VictoriaBrowserEmbedHost : NativeControlHost
 {
     private nint _hwnd;
     private nint _previousParent;
     private bool _attached;
+    private bool _nativeHostUnavailable;
+    private IPlatformHandle? _placeholderHandle;
 
     public nint Hwnd
     {
@@ -21,9 +28,28 @@ public sealed class VictoriaBrowserEmbedHost : NativeControlHost
         set => Bind(value);
     }
 
+    /// <summary>True when Win32 child-host creation failed (missing manifest / OS). JPEG fallback only.</summary>
+    public bool NativeHostUnavailable => _nativeHostUnavailable;
+
+    /// <summary>
+    /// Set the Chromium HWND before attaching to the visual tree.
+    /// Attach only after Bind with a non-zero hwnd so CreateNativeControlCore sees it.
+    /// </summary>
     public void Bind(nint hwnd)
     {
-        if (_hwnd == hwnd && (_attached || hwnd == 0))
+        if (_nativeHostUnavailable)
+        {
+            IsVisible = false;
+            return;
+        }
+
+        if (_hwnd == hwnd && hwnd == 0)
+        {
+            IsVisible = false;
+            return;
+        }
+
+        if (_hwnd == hwnd && _attached)
             return;
 
         DetachIfNeeded();
@@ -35,15 +61,42 @@ public sealed class VictoriaBrowserEmbedHost : NativeControlHost
             return;
         }
 
-        // Toggle visibility so NativeControlHost recreates with the new HWND.
-        IsVisible = false;
         IsVisible = true;
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        if (_nativeHostUnavailable)
+            return;
+
+        try
+        {
+            base.OnAttachedToVisualTree(e);
+        }
+        catch (Exception ex)
+        {
+            // Avalonia Win32NativeControlHost.DumbWindow without supportedOS manifest
+            // throws InvalidOperationException here — never take down Presence.
+            MarkUnavailable("VictoriaBrowserEmbedHost.OnAttachedToVisualTree", ex);
+            try
+            {
+                // Best-effort cleanup if base partially registered visual-tree hooks.
+                base.OnDetachedFromVisualTree(e);
+            }
+            catch
+            {
+                // ignore
+            }
+        }
     }
 
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
     {
-        if (!OperatingSystem.IsWindows() || _hwnd == 0 || parent.Handle == 0)
-            return base.CreateNativeControlCore(parent);
+        if (_nativeHostUnavailable || !OperatingSystem.IsWindows() || parent.Handle == 0)
+            return CreateFallbackHost(parent);
+
+        if (_hwnd == 0)
+            return CreateFallbackHost(parent);
 
         try
         {
@@ -57,25 +110,73 @@ public sealed class VictoriaBrowserEmbedHost : NativeControlHost
             if (SetParent(_hwnd, parent.Handle) == 0 && Marshal.GetLastPInvokeError() != 0)
             {
                 _ = SetWindowLong(_hwnd, GWL_STYLE, originalStyle);
-                return base.CreateNativeControlCore(parent);
+                return CreateFallbackHost(parent);
             }
 
             _attached = true;
+            _placeholderHandle = null;
             ResizeToHost(parent.Handle);
             return new PlatformHandle(_hwnd, "HWND");
         }
-        catch
+        catch (Exception ex)
         {
             // Never take down Presence for a bad Chromium HWND — JPEG fallback stays.
+            PresenceStartupLog.WriteException("VictoriaBrowserEmbedHost.CreateNativeControlCore", ex);
             _attached = false;
-            return base.CreateNativeControlCore(parent);
+            return CreateFallbackHost(parent);
         }
+    }
+
+    /// <summary>
+    /// Empty WS_CHILD placeholder (or safe base host). Never rethrow CreateWindowEx failures
+    /// into MainWindow construction — mark unavailable and stay on JPEG.
+    /// </summary>
+    private IPlatformHandle CreateFallbackHost(IPlatformHandle parent)
+    {
+        try
+        {
+            var handle = base.CreateNativeControlCore(parent);
+            _placeholderHandle = handle;
+            return handle;
+        }
+        catch (Exception ex)
+        {
+            MarkUnavailable("VictoriaBrowserEmbedHost.CreateFallbackHost", ex);
+            // Last resort: return parent so Avalonia has a handle; never DestroyWindow it.
+            _placeholderHandle = null;
+            return parent;
+        }
+    }
+
+    private void MarkUnavailable(string stage, Exception ex)
+    {
+        _nativeHostUnavailable = true;
+        _attached = false;
+        IsVisible = false;
+        PresenceStartupLog.WriteException(stage, ex);
     }
 
     protected override void DestroyNativeControlCore(IPlatformHandle control)
     {
         DetachIfNeeded();
-        // Do not destroy Chromium — only detach. Base would DestroyWindow the handle.
+        // Do not DestroyWindow Chromium, and do not DestroyWindow an Avalonia parent
+        // HWND we may have returned as a last-resort fallback handle.
+        if (_placeholderHandle is not null
+            && control.Handle != 0
+            && control.Handle == _placeholderHandle.Handle
+            && control.Handle != _hwnd)
+        {
+            try
+            {
+                base.DestroyNativeControlCore(control);
+            }
+            catch
+            {
+                // ignore
+            }
+
+            _placeholderHandle = null;
+        }
     }
 
     protected override void OnSizeChanged(SizeChangedEventArgs e)
