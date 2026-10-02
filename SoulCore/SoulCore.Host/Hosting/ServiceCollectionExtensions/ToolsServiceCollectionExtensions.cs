@@ -155,11 +155,20 @@ internal static class ToolsServiceCollectionExtensions
             sp.GetRequiredService<IDesktopControlBackend>(),
             sp.GetRequiredService<IDesktopViewHub>(),
             sp.GetRequiredService<IVictoriaBrowserViewHub>()));
-        services.AddSingleton<ITool, DesktopClickTool>();
-        services.AddSingleton<ITool, DesktopDragTool>();
+        services.AddSingleton<ITool>(sp => new DesktopClickTool(
+            sp.GetRequiredService<IComputerControlGate>(),
+            sp.GetRequiredService<IDesktopControlBackend>(),
+            sp.GetRequiredService<IDesktopViewHub>()));
+        services.AddSingleton<ITool>(sp => new DesktopDragTool(
+            sp.GetRequiredService<IComputerControlGate>(),
+            sp.GetRequiredService<IDesktopControlBackend>(),
+            sp.GetRequiredService<IDesktopViewHub>()));
         services.AddSingleton<ITool, DesktopTypeTool>();
         services.AddSingleton<ITool, DesktopKeyTool>();
-        services.AddSingleton<ITool, DesktopScrollTool>();
+        services.AddSingleton<ITool>(sp => new DesktopScrollTool(
+            sp.GetRequiredService<IComputerControlGate>(),
+            sp.GetRequiredService<IDesktopControlBackend>(),
+            sp.GetRequiredService<IDesktopViewHub>()));
         services.AddSingleton<ITool, DesktopOpenAppTool>();
         services.AddSingleton<ITool, ListDesktopWindowsTool>();
         services.AddSingleton<ITool, FocusDesktopWindowTool>();

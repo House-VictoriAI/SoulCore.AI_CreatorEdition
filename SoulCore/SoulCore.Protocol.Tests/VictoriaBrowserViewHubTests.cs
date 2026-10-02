@@ -66,6 +66,7 @@ public class VictoriaBrowserViewHubTests
     [InlineData("agent cursor → (10,20)", "idle")]
     [InlineData("dragged left from (1,1) to (2,2)", "click")]
     [InlineData("typed 3 character(s)", "idle")]
+    [InlineData("browser click (10,20)", "click")]
     public void InferSoftCursorState_FromDesktopAction(string action, string expected) =>
         Assert.Equal(expected, DesktopViewHub.InferSoftCursorState(action));
 
@@ -87,5 +88,77 @@ public class VictoriaBrowserViewHubTests
         Assert.Equal(12, snap.CursorX);
         Assert.Equal(34, snap.CursorY);
         Assert.Equal(VictoriaBrowserViewHub.CursorClick, snap.CursorState);
+    }
+
+    [Fact]
+    public async Task DesktopClick_PublishesAimThenClickToPresenceHub()
+    {
+        var browser = new VictoriaBrowserViewHub();
+        var desktop = new DesktopViewHub(mirrorCursor: (x, y, state) => browser.RecordCursor(x, y, state));
+        var backend = new ClickOnlyBackend();
+        var gate = new ComputerControlGate(allowDesktopCapture: true, allowComputerControl: true);
+        // Zero dwell so the test stays fast — SoftCursorPresenceFeedback still records.
+        var prevAim = SoftCursorPresenceFeedback.AimLeadMsForTests;
+        var prevClick = SoftCursorPresenceFeedback.ClickDwellMsForTests;
+        SoftCursorPresenceFeedback.AimLeadMsForTests = 0;
+        SoftCursorPresenceFeedback.ClickDwellMsForTests = 0;
+        try
+        {
+            var tool = new DesktopClickTool(gate, backend, desktop);
+            var result = await tool.ExecuteAsync(
+                System.Text.Json.JsonDocument.Parse("""{"x":55,"y":66}""").RootElement);
+
+            Assert.True(result.Success);
+            Assert.Single(backend.Clicks);
+            Assert.Equal((55, 66), backend.Clicks[0]);
+            var snap = browser.GetSnapshot();
+            Assert.Equal(55, snap.CursorX);
+            Assert.Equal(66, snap.CursorY);
+            Assert.Equal(VictoriaBrowserViewHub.CursorClick, snap.CursorState);
+        }
+        finally
+        {
+            SoftCursorPresenceFeedback.AimLeadMsForTests = prevAim;
+            SoftCursorPresenceFeedback.ClickDwellMsForTests = prevClick;
+        }
+    }
+
+    private sealed class ClickOnlyBackend : IDesktopControlBackend
+    {
+        public List<(int x, int y)> Clicks { get; } = new();
+
+        public Task<DesktopOpResult> ScreenshotAsync(int monitor, CancellationToken ct = default) =>
+            Task.FromResult(new DesktopOpResult(true, "shot", null));
+
+        public Task<DesktopOpResult> ClickAsync(
+            int x, int y, string button, int clicks = 1, CancellationToken ct = default)
+        {
+            Clicks.Add((x, y));
+            return Task.FromResult(new DesktopOpResult(true, $"clicked {button} at ({x},{y})", null));
+        }
+
+        public Task<DesktopOpResult> DragAsync(
+            int x1, int y1, int x2, int y2, string button, CancellationToken ct = default) =>
+            Task.FromResult(new DesktopOpResult(true, "drag", null));
+
+        public Task<DesktopOpResult> TypeAsync(string text, CancellationToken ct = default) =>
+            Task.FromResult(new DesktopOpResult(true, "type", null));
+
+        public Task<DesktopOpResult> KeyAsync(string key, CancellationToken ct = default) =>
+            Task.FromResult(new DesktopOpResult(true, "key", null));
+
+        public Task<DesktopOpResult> ScrollAsync(
+            int x, int y, int deltaY, int deltaX = 0, CancellationToken ct = default) =>
+            Task.FromResult(new DesktopOpResult(true, "scroll", null));
+
+        public Task<DesktopOpResult> OpenAppAsync(
+            string app, string? arguments = null, CancellationToken ct = default) =>
+            Task.FromResult(new DesktopOpResult(true, "open", null));
+
+        public Task<DesktopOpResult> ListWindowsAsync(CancellationToken ct = default) =>
+            Task.FromResult(new DesktopOpResult(true, "windows", null));
+
+        public Task<DesktopOpResult> FocusWindowAsync(string title, CancellationToken ct = default) =>
+            Task.FromResult(new DesktopOpResult(true, "focus", null));
     }
 }

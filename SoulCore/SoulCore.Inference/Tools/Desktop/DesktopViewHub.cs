@@ -194,7 +194,8 @@ public sealed class DesktopViewHub : IDesktopViewHub
         // Prefer click flash for press / drag end; keep moves idle (agent cursor →).
         if (action.Contains("clicked", StringComparison.OrdinalIgnoreCase)
             || action.Contains("dragged", StringComparison.OrdinalIgnoreCase)
-            || action.Contains("double-click", StringComparison.OrdinalIgnoreCase))
+            || action.Contains("double-click", StringComparison.OrdinalIgnoreCase)
+            || action.Contains("browser click", StringComparison.OrdinalIgnoreCase))
             return VictoriaBrowserViewHub.CursorClick;
         return VictoriaBrowserViewHub.CursorIdle;
     }
