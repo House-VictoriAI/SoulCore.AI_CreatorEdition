@@ -47,12 +47,16 @@ public sealed class VictoriaBrowserEmbedHost : NativeControlHost
 
         _previousParent = GetParent(_hwnd);
         // CHILD style so layout lives inside Presence; keep visible.
-        var style = GetWindowLong(_hwnd, GWL_STYLE);
-        style = (style | WS_CHILD | WS_VISIBLE) & ~WS_POPUP;
-        _ = SetWindowLong(_hwnd, GWL_STYLE, style);
+var originalStyle = GetWindowLong(_hwnd, GWL_STYLE);
+        var childStyle = (originalStyle | WS_CHILD | WS_VISIBLE) & ~WS_POPUP;
+        _ = SetWindowLong(_hwnd, GWL_STYLE, childStyle);
 
-        if (SetParent(_hwnd, parent.Handle) == 0)
+        Marshal.SetLastPInvokeError(0);
+        if (SetParent(_hwnd, parent.Handle) == 0 && Marshal.GetLastPInvokeError() != 0)
+        {
+            _ = SetWindowLong(_hwnd, GWL_STYLE, originalStyle);
             return base.CreateNativeControlCore(parent);
+        }
 
         _attached = true;
         ResizeToHost(parent.Handle);
