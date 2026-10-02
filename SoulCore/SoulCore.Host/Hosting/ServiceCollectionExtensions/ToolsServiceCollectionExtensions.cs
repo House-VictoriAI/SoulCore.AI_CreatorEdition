@@ -98,13 +98,18 @@ internal static class ToolsServiceCollectionExtensions
         services.AddSingleton<ComputerControlGate>();
         services.AddSingleton<IComputerControlGate>(sp => sp.GetRequiredService<ComputerControlGate>());
         services.AddSingleton<IToolsAccessSettings>(sp => sp.GetRequiredService<ComputerControlGate>());
+        services.AddSingleton<IVictoriaBrowserViewHub, VictoriaBrowserViewHub>();
         services.AddSingleton<IDesktopViewHub>(sp =>
-            new DesktopViewHub(() => sp.GetRequiredService<IToolsAccessSettings>().SoftCursorRestore));
+        {
+            var browser = sp.GetRequiredService<IVictoriaBrowserViewHub>();
+            return new DesktopViewHub(
+                () => sp.GetRequiredService<IToolsAccessSettings>().SoftCursorRestore,
+                mirrorCursor: (x, y, state) => browser.RecordCursor(x, y, state));
+        });
         // PROP-4: honest Presence activity (doing-now), not SoulLoop want slogans.
         services.AddSingleton<SoulCore.Inference.Presence.IPresenceActivityHub>(sp =>
             new SoulCore.Inference.Presence.PresenceActivityHub(sp.GetRequiredService<IDesktopViewHub>()));
         services.AddSingleton<GuestVmBrowserBridgeHolder>();
-        services.AddSingleton<IVictoriaBrowserViewHub, VictoriaBrowserViewHub>();
         services.AddSingleton<IDesktopControlBackend>(sp =>
         {
             IDesktopControlBackend inner;

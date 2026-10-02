@@ -12,7 +12,15 @@ public interface IVictoriaBrowserViewHub
         string? title,
         string? lastAction,
         string? waitingOnYou = null,
-        string? backend = null);
+        string? backend = null,
+        int? frameWidth = null,
+        int? frameHeight = null);
+
+    /// <summary>
+    /// Soft cursor for Presence overlay (VM HWND / guest JPEG). Same palette as PlaywrightClickCursor.
+    /// <paramref name="state"/> is <c>idle</c> or <c>click</c>.
+    /// </summary>
+    void RecordCursor(int x, int y, string state = "idle");
 
     VictoriaBrowserViewSnapshot GetSnapshot();
     bool TryGetImageBytes(out byte[]? bytes, out string contentType);
@@ -27,12 +35,21 @@ public sealed class VictoriaBrowserViewSnapshot
     public string? WaitingOnYou { get; init; }
     public string Backend { get; init; } = "playwright";
     public DateTimeOffset? UpdatedUtc { get; init; }
+    public int? CursorX { get; init; }
+    public int? CursorY { get; init; }
+    /// <summary><c>idle</c> (pink) or <c>click</c> (teal flash).</summary>
+    public string? CursorState { get; init; }
+    public DateTimeOffset? CursorAt { get; init; }
+    public int FrameWidth { get; init; }
+    public int FrameHeight { get; init; }
 }
 
 public sealed class VictoriaBrowserViewHub : IVictoriaBrowserViewHub
 {
     public const string BackendPlaywright = "playwright";
     public const string BackendVboxGuest = "vbox-guest";
+    public const string CursorIdle = "idle";
+    public const string CursorClick = "click";
 
     private readonly object _gate = new();
     private byte[]? _bytes;
@@ -43,6 +60,12 @@ public sealed class VictoriaBrowserViewHub : IVictoriaBrowserViewHub
     private string? _waiting;
     private string _backend = BackendPlaywright;
     private DateTimeOffset? _updated;
+    private int? _cursorX;
+    private int? _cursorY;
+    private string _cursorState = CursorIdle;
+    private DateTimeOffset? _cursorAt;
+    private int _frameWidth;
+    private int _frameHeight;
 
     public void Publish(
         byte[] jpegOrPng,
@@ -50,7 +73,9 @@ public sealed class VictoriaBrowserViewHub : IVictoriaBrowserViewHub
         string? title,
         string? lastAction,
         string? waitingOnYou = null,
-        string? backend = null)
+        string? backend = null,
+        int? frameWidth = null,
+        int? frameHeight = null)
     {
         if (jpegOrPng is null || jpegOrPng.Length == 0)
             return;
@@ -66,7 +91,21 @@ public sealed class VictoriaBrowserViewHub : IVictoriaBrowserViewHub
             if (waitingOnYou is not null) _waiting = waitingOnYou;
             if (!string.IsNullOrWhiteSpace(backend))
                 _backend = backend.Trim();
+            if (frameWidth is > 0) _frameWidth = frameWidth.Value;
+            if (frameHeight is > 0) _frameHeight = frameHeight.Value;
             _updated = DateTimeOffset.UtcNow;
+        }
+    }
+
+    public void RecordCursor(int x, int y, string state = CursorIdle)
+    {
+        lock (_gate)
+        {
+            _cursorX = x;
+            _cursorY = y;
+            _cursorState = NormalizeCursorState(state);
+            _cursorAt = DateTimeOffset.UtcNow;
+            _updated = _cursorAt;
         }
     }
 
@@ -82,7 +121,13 @@ public sealed class VictoriaBrowserViewHub : IVictoriaBrowserViewHub
                 LastAction = _lastAction,
                 WaitingOnYou = _waiting,
                 Backend = _backend,
-                UpdatedUtc = _updated
+                UpdatedUtc = _updated,
+                CursorX = _cursorX,
+                CursorY = _cursorY,
+                CursorState = _cursorX is null ? null : _cursorState,
+                CursorAt = _cursorAt,
+                FrameWidth = _frameWidth,
+                FrameHeight = _frameHeight
             };
         }
     }
@@ -115,7 +160,27 @@ public sealed class VictoriaBrowserViewHub : IVictoriaBrowserViewHub
         if (!Desktop.DesktopViewHub.TryGetImageBytesFromToolData(data, out var bytes))
             return false;
 
-        hub.Publish(bytes, url, title ?? "victoria-sandbox", lastAction, waitingOnYou: null, backend);
+        int? w = null;
+        int? h = null;
+        if (Desktop.DesktopViewHub.TryGetSizeFromToolData(data, out var sw, out var sh))
+        {
+            w = sw;
+            h = sh;
+        }
+
+        hub.Publish(bytes, url, title ?? "victoria-sandbox", lastAction, waitingOnYou: null, backend, w, h);
         return true;
     }
+
+    public static string NormalizeCursorState(string? state)
+    {
+        if (string.Equals(state, CursorClick, StringComparison.OrdinalIgnoreCase))
+            return CursorClick;
+        return CursorIdle;
+    }
+
+    /// <summary>Whether Presence should draw the pink/teal soft cursor (not Playwright DOM/burn-in).</summary>
+    public static bool WantsPresenceSoftCursor(string? backend, string? embedSurface) =>
+        string.Equals(embedSurface, "vm", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(backend, BackendVboxGuest, StringComparison.OrdinalIgnoreCase);
 }

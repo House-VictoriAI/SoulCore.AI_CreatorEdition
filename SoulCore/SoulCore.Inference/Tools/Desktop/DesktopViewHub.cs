@@ -1,3 +1,5 @@
+using SoulCore.Inference.Tools.Browser;
+
 namespace SoulCore.Inference.Tools.Desktop;
 
 /// <summary>
@@ -91,13 +93,18 @@ public sealed class DesktopViewHub : IDesktopViewHub
     private readonly string _galleryDir;
     private readonly List<DesktopViewGalleryEntry> _gallery = new();
     private long _gallerySeq;
+    private readonly Action<int, int, string>? _mirrorCursor;
 
-    public DesktopViewHub(Func<bool>? softCursor = null, string? galleryDirectory = null)
+    public DesktopViewHub(
+        Func<bool>? softCursor = null,
+        string? galleryDirectory = null,
+        Action<int, int, string>? mirrorCursor = null)
     {
         _softCursor = softCursor ?? (() => true);
         _galleryDir = string.IsNullOrWhiteSpace(galleryDirectory)
             ? DefaultGalleryDirectory()
             : galleryDirectory.Trim();
+        _mirrorCursor = mirrorCursor;
     }
 
     public string GalleryDirectory => _galleryDir;
@@ -162,13 +169,34 @@ public sealed class DesktopViewHub : IDesktopViewHub
 
     public void RecordAction(string action, int? cursorX = null, int? cursorY = null)
     {
+        string? mirrorState = null;
         lock (_gate)
         {
             _lastAction = string.IsNullOrWhiteSpace(action) ? _lastAction : action.Trim();
             if (cursorX is not null) _cursorX = cursorX;
             if (cursorY is not null) _cursorY = cursorY;
             _updatedAt = DateTimeOffset.UtcNow;
+            if (cursorX is int && cursorY is int)
+                mirrorState = InferSoftCursorState(_lastAction);
         }
+
+        if (mirrorState is not null && cursorX is int mx && cursorY is int my)
+            _mirrorCursor?.Invoke(mx, my, mirrorState);
+    }
+
+    /// <summary>
+    /// Map desktop action text → Presence soft-cursor state (pink idle / teal click).
+    /// </summary>
+    public static string InferSoftCursorState(string? action)
+    {
+        if (string.IsNullOrWhiteSpace(action))
+            return VictoriaBrowserViewHub.CursorIdle;
+        // Prefer click flash for press / drag end; keep moves idle (agent cursor →).
+        if (action.Contains("clicked", StringComparison.OrdinalIgnoreCase)
+            || action.Contains("dragged", StringComparison.OrdinalIgnoreCase)
+            || action.Contains("double-click", StringComparison.OrdinalIgnoreCase))
+            return VictoriaBrowserViewHub.CursorClick;
+        return VictoriaBrowserViewHub.CursorIdle;
     }
 
     public DesktopViewSnapshot GetSnapshot()
@@ -296,6 +324,18 @@ public sealed class DesktopViewHub : IDesktopViewHub
         if (!TryExtractImage(data, out bytes, out _, out _, out _, out _))
             return false;
         return bytes.Length > 0;
+    }
+
+    /// <summary>Extract width/height from desktop/browser tool Data when present.</summary>
+    public static bool TryGetSizeFromToolData(object? data, out int width, out int height)
+    {
+        width = 0;
+        height = 0;
+        if (data is null)
+            return false;
+        if (!TryExtractImage(data, out _, out _, out width, out height, out _))
+            return false;
+        return width > 0 && height > 0;
     }
 
     private string? TryPersistGallery(

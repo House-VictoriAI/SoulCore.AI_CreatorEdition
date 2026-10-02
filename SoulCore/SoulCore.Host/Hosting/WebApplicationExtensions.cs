@@ -468,6 +468,7 @@ internal static class WebApplicationExtensions
             var opts = tools.Value;
             var embed = opts.VmEmbedPane || opts.PlaywrightEmbedPane;
             var embedSurface = opts.VmEmbedPane ? "vm" : opts.PlaywrightEmbedPane ? "playwright" : "none";
+            var softCursor = VictoriaBrowserViewHub.WantsPresenceSoftCursor(snap.Backend, embedSurface);
             return Results.Json(new
             {
                 hasImage = snap.HasImage,
@@ -480,8 +481,14 @@ internal static class WebApplicationExtensions
                 updatedAt = snap.UpdatedUtc,
                 embedPane = embed,
                 embedSurface,
+                cursorX = softCursor ? snap.CursorX : null,
+                cursorY = softCursor ? snap.CursorY : null,
+                cursorState = softCursor ? snap.CursorState : null,
+                cursorAt = softCursor ? snap.CursorAt : null,
+                frameWidth = snap.FrameWidth,
+                frameHeight = snap.FrameHeight,
                 note = opts.VmEmbedPane
-                    ? "Her screen prefers VirtualBox HWND via GET /browser/embed (surface=vm). JPEG is fallback."
+                    ? "Her screen prefers VirtualBox HWND via GET /browser/embed (surface=vm). Soft cursor pink→teal on desktop_click/move. JPEG is fallback."
                     : snap.Backend == VictoriaBrowserViewHub.BackendVboxGuest
                         ? "VirtualBox guest framebuffer (victoria-sandbox). Hover coords = guest origin 0,0 for desktop_click. In-memory only."
                         : embed
