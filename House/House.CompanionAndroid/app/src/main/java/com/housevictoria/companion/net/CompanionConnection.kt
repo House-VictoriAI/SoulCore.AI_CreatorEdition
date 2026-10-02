@@ -59,6 +59,11 @@ object CompanionConnection {
         _serviceRunning.value = running
     }
 
+    /** Keep the UI up when the foreground service is rejected by the OS. */
+    fun reportFailure(detail: String) {
+        _state.value = WsConnectionState.Failed to detail
+    }
+
     /**
      * Start the foreground service and connect WS using the given endpoint.
      * Safe to call repeatedly (service re-delivers START with new URL/token).

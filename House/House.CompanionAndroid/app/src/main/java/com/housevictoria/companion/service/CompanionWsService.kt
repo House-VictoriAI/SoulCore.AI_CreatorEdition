@@ -63,9 +63,17 @@ class CompanionWsService : Service() {
                     ?: config.wsUrl
                 val token = intent?.getStringExtra(EXTRA_TOKEN) ?: config.token
 
-                promoteToForeground(connecting = true)
-                CompanionConnection.client.connect(wsUrl, token)
-                Log.i(TAG, "WS connect requested")
+                try {
+                    promoteToForeground(connecting = true)
+                    CompanionConnection.client.connect(wsUrl, token)
+                    Log.i(TAG, "WS connect requested")
+                } catch (error: Exception) {
+                    Log.e(TAG, "Foreground connection failed", error)
+                    CompanionConnection.reportFailure(
+                        error.message ?: "Could not start the background connection"
+                    )
+                    stopSelf()
+                }
             }
         }
         return START_STICKY
@@ -121,7 +129,14 @@ class CompanionWsService : Service() {
                 putExtra(EXTRA_WS_URL, wsUrl)
                 putExtra(EXTRA_TOKEN, token)
             }
-            ContextCompat.startForegroundService(context, intent)
+            try {
+                ContextCompat.startForegroundService(context, intent)
+            } catch (error: Exception) {
+                Log.e(TAG, "Could not start companion service", error)
+                CompanionConnection.reportFailure(
+                    error.message ?: "Could not start the background connection"
+                )
+            }
         }
 
         fun stop(context: Context) {
