@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:House.ChatDesktop.Controls"
         x:Class="House.ChatDesktop.MainWindow"
         Title="House Victoria — Presence"
         Height="780" Width="1180"
@@ -237,14 +238,17 @@
                       PointerMoved="VictoriaBrowserSurface_PointerMoved"
                       PointerExited="VictoriaBrowserSurface_PointerExited"
                       PointerPressed="VictoriaBrowserSurface_PointerPressed"
-                      ToolTip.Tip="Hover for guest click coords · click to copy for desktop_click">
+                      ToolTip.Tip="Embedded Chromium when live · hover JPEG fallback for click coords">
                 <Grid>
                   <TextBlock x:Name="VictoriaBrowserEmptyText"
-                             Text="No VirtualBox frame yet — ask her to screenshot; hover for guest coords"
+                             Text="Waiting for Victoria's browser — pink cursor idle, teal on click"
                              Foreground="{DynamicResource MutedBrush}" FontSize="11" TextWrapping="Wrap"
                              Margin="10" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                   <Image x:Name="VictoriaBrowserImage" Stretch="Uniform" IsVisible="False"
                          HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                  <controls:VictoriaBrowserEmbedHost x:Name="VictoriaBrowserEmbedHost"
+                             IsVisible="False"
+                             HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                   <Border x:Name="VictoriaBrowserCoordBadge" IsVisible="False"
                           HorizontalAlignment="Left" VerticalAlignment="Top"
                           Margin="8" Padding="8,4" CornerRadius="4"

@@ -771,8 +771,12 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
         await page.Mouse.MoveAsync(x, y).ConfigureAwait(false);
         try
         {
+            // Teal click-state flash (PROP-14.1); falls back if script not yet mounted.
             await page.EvaluateAsync(
-                @"([x, y]) => { if (window.__scShowClick) window.__scShowClick(x, y); }",
+                @"([x, y]) => {
+                    if (window.__scShowClick) window.__scShowClick(x, y);
+                    else if (window.__scMoveCursor) window.__scMoveCursor(x, y);
+                  }",
                 new[] { x, y }).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -780,7 +784,7 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
             _log?.LogDebug(ex, "Playwright click cursor move failed");
         }
 
-        // Publish aim frame with burn-in BEFORE click — overlay alone is easy to miss between polls.
+        // Publish aim frame with teal burn-in BEFORE click — overlay alone is easy to miss between polls.
         await PublishFrameAsync(page, actionLabel, ct, clickX: x, clickY: y).ConfigureAwait(false);
         await page.WaitForTimeoutAsync(AimDwellMs).ConfigureAwait(false);
     }
@@ -811,7 +815,7 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
             }
 
             _playwright ??= await Playwright.CreateAsync().ConfigureAwait(false);
-            var headed = _opts.Value.PlaywrightHeaded;
+            var headed = _opts.Value.PlaywrightHeaded || _opts.Value.PlaywrightEmbedPane;
             // Pin ExecutablePath to chromium-1148 chrome.exe (same path install-playwright verifies).
             // Playwright 1.49 headless otherwise prefers chromium-headless-shell, which made the
             // terminal say OK while Victoria still failed — and she then asked for VirtualBox.

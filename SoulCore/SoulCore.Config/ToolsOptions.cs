@@ -67,8 +67,14 @@ public sealed class ToolsOptions
     /// </summary>
     public string PlaywrightUserDataDir { get; set; } = "";
 
-    /// <summary>When true, launch headed Chromium for debugging (stream still preferred for LinearThrone).</summary>
+    /// <summary>When true, launch headed Chromium (required for PROP-14 HWND embed on desk).</summary>
     public bool PlaywrightHeaded { get; set; }
+
+    /// <summary>
+    /// PROP-14: Presence should SetParent Victoria's headed Chromium HWND into Her screen.
+    /// Desk Windows only; Host forces headed when this is true. JPEG/screencast = fallback.
+    /// </summary>
+    public bool PlaywrightEmbedPane { get; set; }
 
     /// <summary>Loopback base URL for native browser capture bridge (default :17891).</summary>
     public string BrowserBridgeUrl { get; set; } = "http://127.0.0.1:17891";
