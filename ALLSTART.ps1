@@ -339,6 +339,17 @@ Write-Host "GUI target: $($env:HOUSE_SOULCORE_HOST):$($env:HOUSE_SOULCORE_PORT)"
 # OPS-198: quick Playwright Chromium check only (soft-fail). Never download browsers here -
 # a multi-minute install inside ALLSTART blocks Host/GUI startup. Install once separately.
 $InstallPlaywright = Join-Path $RepoRoot "SoulCore\scripts\install-playwright.ps1"
+$EnvFile = Join-Path $RepoRoot "SoulCore\.env"
+if (Test-Path -LiteralPath $EnvFile) {
+    $envNative = Select-String -Path $EnvFile -Pattern '^\s*SOULCORE_Tools__BrowserBackend\s*=\s*native\s*$' -CaseSensitive:$false -ErrorAction SilentlyContinue
+    if ($envNative) {
+        Write-Host ""
+        Write-Host ">>> WARNING: SoulCore\.env sets SOULCORE_Tools__BrowserBackend=native" -ForegroundColor Red
+        Write-Host ">>> That FORCES VirtualBox guest Firefox for websites (overrides appsettings playwright)." -ForegroundColor Red
+        Write-Host ">>> Fix: delete that line (or set =playwright), then .\ALLSTART.ps1 -RestartHost" -ForegroundColor Yellow
+        Write-Host ""
+    }
+}
 if ($SkipPlaywrightInstall) {
     Write-Host "=== ALLSTART: Playwright verify skipped (-SkipPlaywrightInstall) ==="
 } elseif (Test-Path -LiteralPath $InstallPlaywright) {

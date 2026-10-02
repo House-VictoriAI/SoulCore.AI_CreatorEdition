@@ -199,7 +199,9 @@ internal static class ToolsServiceCollectionExtensions
         services.AddSingleton<IBrowserBridge>(sp =>
         {
             var opts = sp.GetRequiredService<IOptions<ToolsOptions>>().Value;
-            var backend = (opts.BrowserBackend ?? ToolsOptions.BackendNative).Trim();
+            var backend = (opts.BrowserBackend ?? ToolsOptions.BackendPlaywright).Trim();
+            if (string.IsNullOrWhiteSpace(backend))
+                backend = ToolsOptions.BackendPlaywright;
 
             // BED-195: Playwright wins over GuestVm even when DesktopTargetWindowTitle is set.
             if (string.Equals(backend, ToolsOptions.BackendPlaywright, StringComparison.OrdinalIgnoreCase))
