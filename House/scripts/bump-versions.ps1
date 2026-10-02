@@ -28,12 +28,12 @@ function Get-CsprojVersion([string]$path) {
 function Set-CsprojVersion([string]$path, [string]$newVersion) {
   $raw = Get-Content -Raw -Path $path
   if ($raw -notmatch '<Version>') {
-    throw "No <Version> element in $path — add Version/InformationalVersion first."
+    throw "No <Version> element in $path - add Version/InformationalVersion first."
   }
   $updated = [regex]::Replace($raw, '(?<=<Version>)[^<]+(?=</Version>)', $newVersion)
   $updated = [regex]::Replace($updated, '(?<=<InformationalVersion>)[^<]+(?=</InformationalVersion>)', $newVersion)
   if ($updated -eq $raw -and $raw -notmatch [regex]::Escape("<Version>$newVersion</Version>")) {
-    # InformationalVersion may be missing — ensure Version changed at least.
+    # InformationalVersion may be missing - ensure Version changed at least.
     if ($raw -notmatch "<Version>$newVersion</Version>") {
       throw "Failed to rewrite Version in $path"
     }
