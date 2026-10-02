@@ -17,11 +17,15 @@
 #
 # Install: run Setup.exe from presence-releases (Start Menu shortcut created by Velopack).
 # Presence auto-starts SoulCore.Host + Ollama on open when Auto-start is enabled (default).
-# Point Settings → System → SoulCore repo folder at your checkout (folder with ALLSTART.ps1),
-# or set HOUSE_SOULCORE_REPO — required when the app is installed outside the repo.
+# Point Settings > System > SoulCore repo folder at your checkout (folder with ALLSTART.ps1),
+# or set HOUSE_SOULCORE_REPO - required when the app is installed outside the repo.
 # Updates: Presence checks GitHub Releases (Linearthrone/SoulCore.AI) or HOUSE_VICTORIA_UPDATE_URL.
 # -Publish uploads presence-releases/* to a GitHub Release tag presence-v{version} so Update works.
 # Prefer -Bump (or House/scripts/bump-versions.ps1) before packing so every fix gets a new version.
+#
+# IMPORTANT: Keep this file ASCII-only. Windows PowerShell 5.x defaults to a non-UTF8
+# code page and will break on em-dashes / arrows inside double-quoted strings
+# (that is why Presence Release CI never published Setup.exe).
 
 param(
   [string]$Version = "",
@@ -90,7 +94,7 @@ Write-Host 'Run Setup.exe on the target PC. Then Presence Settings > Updates (or
 
 if ($Publish) {
   $gh = Get-Command gh -ErrorAction SilentlyContinue
-  if (-not $gh) { throw 'gh CLI not found — install GitHub CLI to use -Publish.' }
+  if (-not $gh) { throw 'gh CLI not found - install GitHub CLI to use -Publish.' }
 
   $tag = "presence-v$Version"
   $assets = @(Get-ChildItem -Path $releaseDir -File | ForEach-Object { $_.FullName })
@@ -98,7 +102,7 @@ if ($Publish) {
 
   & gh release view $tag 2>$null | Out-Null
   if ($LASTEXITCODE -eq 0) {
-    Write-Host "Release $tag already exists — uploading/replacing assets..."
+    Write-Host "Release $tag already exists - uploading/replacing assets..."
     & gh release upload $tag @assets --clobber
     if ($LASTEXITCODE -ne 0) { throw "gh release upload failed for $tag" }
   }
@@ -106,11 +110,11 @@ if ($Publish) {
     Write-Host "Creating GitHub Release $tag ..."
     & gh release create $tag @assets `
       --title "Presence $Version" `
-      --notes "House Victoria Presence $Version (Velopack). Install Setup.exe, or use Update in an existing install. Host is separate — restart Host for Playwright/tool fixes."
+      --notes "House Victoria Presence $Version (Velopack). Install Setup.exe, or use Update in an existing install. Host is separate - restart Host for Playwright/tool fixes."
     if ($LASTEXITCODE -ne 0) { throw "gh release create failed for $tag" }
   }
 
-  Write-Host "Published $tag — installed Presence can now use Update."
+  Write-Host "Published $tag - installed Presence can now use Update."
 }
 else {
   Write-Host 'To feed the Update button: re-run with -Publish (or let the Presence Release GitHub Action pack on main).'

@@ -1,4 +1,4 @@
-# PROP-4.2 — shortcut helper for *dev* builds (bin/Release).
+# PROP-4.2 - shortcut helper for *dev* builds (bin/Release).
 # Prefer the Velopack Setup.exe from pack-presence.ps1 for a real install + updates.
 #
 # Usage:
@@ -19,7 +19,7 @@ $exeCandidates = @(
 )
 $exe = $exeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $exe) {
-  Write-Host 'Building Release ChatDesktop…'
+  Write-Host 'Building Release ChatDesktop...'
   dotnet build (Join-Path $repo 'House\House.ChatDesktop\House.ChatDesktop.csproj') -c Release
   $exe = $exeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
@@ -33,7 +33,7 @@ function New-Shortcut([string]$path, [string]$target) {
   $sc.TargetPath = $target
   $sc.WorkingDirectory = Split-Path $target -Parent
   if (Test-Path $ico) { $sc.IconLocation = "$ico,0" }
-  $sc.Description = 'House Victoria — Presence'
+  $sc.Description = 'House Victoria - Presence'
   $sc.Save()
   Write-Host "Wrote $path"
 }
@@ -44,4 +44,4 @@ New-Shortcut (Join-Path $startDir 'House Victoria Presence.lnk') $exe
 New-Shortcut (Join-Path $env:USERPROFILE 'Desktop\House Victoria Presence.lnk') $exe
 
 Write-Host "Done. Launch from Start Menu or Desktop. Exe: $exe"
-Write-Host 'For a real installer + Update button feed: House/scripts/pack-presence.ps1 → run Setup.exe.'
+Write-Host 'For a real installer + Update button feed: House/scripts/pack-presence.ps1 -> run Setup.exe.'

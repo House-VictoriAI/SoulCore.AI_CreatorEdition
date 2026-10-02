@@ -43,6 +43,20 @@ jobs:
           "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "Presence version $v"
 
+      - name: Guard pack-presence.ps1 is ASCII-only
+        shell: pwsh
+        run: |
+          $path = 'House/scripts/pack-presence.ps1'
+          $bytes = [System.IO.File]::ReadAllBytes($path)
+          $bad = @()
+          for ($i = 0; $i -lt $bytes.Length; $i++) {
+            if ($bytes[$i] -gt 127) { $bad += $i }
+          }
+          if ($bad.Count -gt 0) {
+            throw "$path contains $($bad.Count) non-ASCII byte(s) at offset(s) $($bad[0..([Math]::Min(9,$bad.Count-1))] -join ','). Windows PowerShell 5.x mis-parses UTF-8 punctuation and never packs Setup.exe."
+          }
+          Write-Host "$path is ASCII-only ($($bytes.Length) bytes)."
+
       - name: Skip if release tag already exists
         id: skip
         shell: bash
@@ -63,6 +77,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File House/scripts/pack-presence.ps1 `
+          # Run under pwsh (UTF-8). Do not nest Windows PowerShell 5.x -
+          # it mis-parses UTF-8 em-dashes in pack-presence.ps1 and never packs Setup.exe.
+          & House/scripts/pack-presence.ps1 `
             -Version "${{ steps.ver.outputs.version }}" `
             -Publish
