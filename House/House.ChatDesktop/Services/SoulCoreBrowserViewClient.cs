@@ -25,6 +25,7 @@ public sealed class BrowserEmbedSnapshot
 {
     public bool Reachable { get; init; }
     public string Mode { get; init; } = "disabled";
+    public string Surface { get; init; } = "none";
     public long Hwnd { get; init; }
     public int Pid { get; init; }
     public string? Title { get; init; }
@@ -153,6 +154,7 @@ public sealed class SoulCoreBrowserViewClient : IDisposable
             {
                 Reachable = true,
                 Mode = dto?.Mode ?? "fallback",
+                Surface = dto?.Surface ?? "none",
                 Hwnd = dto?.Hwnd ?? 0,
                 Pid = dto?.Pid ?? 0,
                 Title = dto?.Title,
@@ -195,12 +197,18 @@ public sealed class SoulCoreBrowserViewClient : IDisposable
 
         [JsonPropertyName("embedPane")]
         public bool EmbedPane { get; set; }
+
+        [JsonPropertyName("embedSurface")]
+        public string? EmbedSurface { get; set; }
     }
 
     private sealed class EmbedDto
     {
         [JsonPropertyName("mode")]
         public string? Mode { get; set; }
+
+        [JsonPropertyName("surface")]
+        public string? Surface { get; set; }
 
         [JsonPropertyName("hwnd")]
         public long Hwnd { get; set; }

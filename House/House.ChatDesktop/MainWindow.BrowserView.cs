@@ -63,7 +63,9 @@ public partial class MainWindow
         var when = snap.UpdatedAt?.ToLocalTime().ToString("h:mm:ss tt") ?? "-";
         var embedded = embed is { Mode: "embedded", Hwnd: > 0 } && OperatingSystem.IsWindows();
         var modeLabel = embedded
-            ? "embedded"
+            ? (string.IsNullOrWhiteSpace(embed!.Surface) || embed.Surface == "none"
+                ? "embedded"
+                : $"embedded · {embed.Surface}")
             : embed?.Mode is { Length: > 0 } m && m != "disabled"
                 ? m
                 : (snap.Backend ?? "playwright");

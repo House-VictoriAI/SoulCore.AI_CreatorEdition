@@ -461,11 +461,13 @@ internal static class WebApplicationExtensions
             return Results.File(bytes, contentType);
         });
 
-        // FED-196: near-live Victoria screen (Playwright Chromium or VirtualBox guest framebuffer).
+        // FED-196: near-live Victoria screen (Playwright Chromium or VirtualBox guest / HWND embed).
         app.MapGet("/browser/view", (IVictoriaBrowserViewHub view, IOptions<ToolsOptions> tools) =>
         {
             var snap = view.GetSnapshot();
-            var embed = tools.Value.PlaywrightEmbedPane;
+            var opts = tools.Value;
+            var embed = opts.VmEmbedPane || opts.PlaywrightEmbedPane;
+            var embedSurface = opts.VmEmbedPane ? "vm" : opts.PlaywrightEmbedPane ? "playwright" : "none";
             return Results.Json(new
             {
                 hasImage = snap.HasImage,
@@ -477,11 +479,14 @@ internal static class WebApplicationExtensions
                 backend = snap.Backend,
                 updatedAt = snap.UpdatedUtc,
                 embedPane = embed,
-                note = snap.Backend == VictoriaBrowserViewHub.BackendVboxGuest
-                    ? "VirtualBox guest framebuffer (victoria-sandbox). Hover coords = guest origin 0,0 for desktop_click. In-memory only."
-                    : embed
-                        ? "PROP-14: Prefer HWND embed via GET /browser/embed; JPEG is fallback only."
-                        : "Victoria's dedicated Playwright Chromium (not Kayleigh's Chrome). In-memory stream only — not written to desktop screenshot gallery."
+                embedSurface,
+                note = opts.VmEmbedPane
+                    ? "Her screen prefers VirtualBox HWND via GET /browser/embed (surface=vm). JPEG is fallback."
+                    : snap.Backend == VictoriaBrowserViewHub.BackendVboxGuest
+                        ? "VirtualBox guest framebuffer (victoria-sandbox). Hover coords = guest origin 0,0 for desktop_click. In-memory only."
+                        : embed
+                            ? "PROP-14: Prefer HWND embed via GET /browser/embed; JPEG is fallback only."
+                            : "Victoria's dedicated Playwright Chromium (not Kayleigh's Chrome). In-memory stream only — not written to desktop screenshot gallery."
             });
         });
 
@@ -492,7 +497,7 @@ internal static class WebApplicationExtensions
             return Results.File(bytes, contentType);
         });
 
-        // PROP-14.2: Windows desk — expose Victoria Playwright Chromium HWND for Presence SetParent.
+        // PROP-14 / VM embed: Windows desk — expose Chromium or VirtualBox HWND for Presence SetParent.
         app.MapGet("/browser/embed", async (
             IBrowserBridge bridge,
             IOptions<ToolsOptions> tools,
@@ -500,15 +505,16 @@ internal static class WebApplicationExtensions
             CancellationToken ct) =>
         {
             var opts = tools.Value;
-            if (!opts.PlaywrightEmbedPane)
+            if (!opts.VmEmbedPane && !opts.PlaywrightEmbedPane)
             {
                 return Results.Json(new
                 {
                     mode = "disabled",
+                    surface = "none",
                     hwnd = 0,
                     pid = 0,
                     title = (string?)null,
-                    detail = "PlaywrightEmbedPane is off. Set Tools:PlaywrightEmbedPane=true and restart Host."
+                    detail = "Neither VmEmbedPane nor PlaywrightEmbedPane is on. Enable Tools:VmEmbedPane (VirtualBox) or Tools:PlaywrightEmbedPane, then restart Host."
                 });
             }
 
@@ -517,6 +523,7 @@ internal static class WebApplicationExtensions
                 return Results.Json(new
                 {
                     mode = "fallback",
+                    surface = opts.VmEmbedPane ? "vm" : "playwright",
                     hwnd = 0,
                     pid = 0,
                     title = (string?)null,
@@ -529,10 +536,44 @@ internal static class WebApplicationExtensions
                 return Results.Json(new
                 {
                     mode = "capture_off",
+                    surface = opts.VmEmbedPane ? "vm" : "playwright",
                     hwnd = 0,
                     pid = 0,
                     title = (string?)null,
                     detail = "AllowBrowserCapture is false — refuse embed."
+                });
+            }
+
+            // VM embed wins when enabled — Her screen shows victoria-sandbox VirtualBox window.
+            if (opts.VmEmbedPane)
+            {
+                var titleFilter = (opts.DesktopTargetWindowTitle ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(titleFilter))
+                    titleFilter = "victoria-sandbox";
+
+                var vm = VictoriaVirtualBoxWindowLocator.TryFind(titleFilter);
+                if (vm is null)
+                {
+                    return Results.Json(new
+                    {
+                        mode = "fallback",
+                        surface = "vm",
+                        hwnd = 0,
+                        pid = 0,
+                        title = (string?)null,
+                        detail = $"No VirtualBox window matching '{titleFilter}' yet — start victoria-sandbox (visible, not minimized) or use JPEG fallback."
+                    });
+                }
+
+                return Results.Json(new
+                {
+                    mode = "embedded",
+                    surface = "vm",
+                    hwnd = vm.Hwnd.ToInt64(),
+                    pid = vm.Pid,
+                    title = vm.Title,
+                    exePath = vm.ExePath,
+                    detail = "Presence should SetParent this VirtualBox HWND into Her screen (no floating twin)."
                 });
             }
 
@@ -545,6 +586,7 @@ internal static class WebApplicationExtensions
                     return Results.Json(new
                     {
                         mode = "fallback",
+                        surface = "playwright",
                         hwnd = 0,
                         pid = 0,
                         title = (string?)null,
@@ -559,6 +601,7 @@ internal static class WebApplicationExtensions
                 return Results.Json(new
                 {
                     mode = "fallback",
+                    surface = "playwright",
                     hwnd = 0,
                     pid = 0,
                     title = (string?)null,
@@ -569,6 +612,7 @@ internal static class WebApplicationExtensions
             return Results.Json(new
             {
                 mode = "embedded",
+                surface = "playwright",
                 hwnd = found.Hwnd.ToInt64(),
                 pid = found.Pid,
                 title = found.Title,
