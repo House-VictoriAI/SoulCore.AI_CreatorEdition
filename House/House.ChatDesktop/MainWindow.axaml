@@ -248,8 +248,8 @@
                   <!-- NativeControlHost is created only when embedding — cold start must not
                        hit Win32 CreateWindowEx (needs app.manifest; still defer as belt/suspenders). -->
                   <Panel x:Name="VictoriaBrowserEmbedSlot"
-                             IsVisible="False"
-                             HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                         IsVisible="False"
+                         HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                   <Border x:Name="VictoriaBrowserCoordBadge" IsVisible="False"
                           HorizontalAlignment="Left" VerticalAlignment="Top"
                           Margin="8" Padding="8,4" CornerRadius="4"

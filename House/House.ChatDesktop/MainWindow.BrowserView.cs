@@ -122,63 +122,89 @@ public partial class MainWindow
 
     private void ApplyVictoriaBrowserEmbed(BrowserEmbedSnapshot embed)
     {
-        var host = EnsureVictoriaBrowserEmbedHost();
-        if (host is null)
-            return;
-
-        if (host.NativeHostUnavailable)
-        {
-            if (VictoriaBrowserWaitingText is not null && string.IsNullOrWhiteSpace(VictoriaBrowserWaitingText.Text))
-            {
-                VictoriaBrowserWaitingText.Text = "Embed: native host unavailable — JPEG fallback";
-                VictoriaBrowserWaitingText.IsVisible = true;
-            }
-
-            return;
-        }
-
-        if (embed.Hwnd == _lastEmbedHwnd && string.Equals(_lastEmbedMode, embed.Mode, StringComparison.Ordinal))
+        if (embed.Hwnd == _lastEmbedHwnd
+            && string.Equals(_lastEmbedMode, embed.Mode, StringComparison.Ordinal)
+            && _victoriaBrowserEmbedHost is { NativeHostUnavailable: false })
             return;
 
         _lastEmbedHwnd = embed.Hwnd;
         _lastEmbedMode = embed.Mode;
-        if (VictoriaBrowserEmbedSlot is not null)
-            VictoriaBrowserEmbedSlot.IsVisible = true;
-        host.Bind((nint)embed.Hwnd);
-    }
-
-    private VictoriaBrowserEmbedHost? EnsureVictoriaBrowserEmbedHost()
-    {
-        if (_victoriaBrowserEmbedHost is not null)
-            return _victoriaBrowserEmbedHost;
-
-        if (VictoriaBrowserEmbedSlot is null || !OperatingSystem.IsWindows())
-            return null;
 
         try
         {
-            _victoriaBrowserEmbedHost = new VictoriaBrowserEmbedHost
+            // Recreate each bind so CreateNativeControlCore runs with the HWND already set.
+            // NativeControlHost must not sit in the visual tree on cold start (CreateWindowEx).
+            DestroyVictoriaBrowserEmbedHost();
+
+            if (VictoriaBrowserEmbedSlot is null || !OperatingSystem.IsWindows() || embed.Hwnd <= 0)
+                return;
+
+            var host = new VictoriaBrowserEmbedHost
             {
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
                 VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch,
                 IsVisible = false
             };
-            VictoriaBrowserEmbedSlot.Children.Add(_victoriaBrowserEmbedHost);
-            PresenceStartupLog.Write("VictoriaBrowserEmbedHost created (deferred)");
-            return _victoriaBrowserEmbedHost;
+            // Bind before Add so OnAttachedToVisualTree / CreateNativeControlCore see _hwnd.
+            host.Bind((nint)embed.Hwnd);
+            VictoriaBrowserEmbedSlot.Children.Add(host);
+            VictoriaBrowserEmbedSlot.IsVisible = true;
+            _victoriaBrowserEmbedHost = host;
+
+            if (host.NativeHostUnavailable)
+            {
+                PresenceStartupLog.Write(
+                    "VictoriaBrowserEmbedHost unavailable after attach — JPEG fallback");
+                NoteEmbedUnavailable();
+                DestroyVictoriaBrowserEmbedHost();
+            }
         }
         catch (Exception ex)
         {
-            PresenceStartupLog.WriteException("EnsureVictoriaBrowserEmbedHost", ex);
-            return null;
+            PresenceStartupLog.WriteException("ApplyVictoriaBrowserEmbed", ex);
+            NoteEmbedUnavailable();
+            DestroyVictoriaBrowserEmbedHost();
         }
+    }
+
+    private void NoteEmbedUnavailable()
+    {
+        if (VictoriaBrowserWaitingText is null)
+            return;
+        if (!string.IsNullOrWhiteSpace(VictoriaBrowserWaitingText.Text))
+            return;
+        VictoriaBrowserWaitingText.Text = "Embed: native host unavailable — JPEG fallback";
+        VictoriaBrowserWaitingText.IsVisible = true;
     }
 
     private void ClearVictoriaBrowserEmbed(string? detail)
     {
         _lastEmbedHwnd = 0;
         _lastEmbedMode = detail;
-        _victoriaBrowserEmbedHost?.Bind(0);
+        DestroyVictoriaBrowserEmbedHost();
+    }
+
+    private void DestroyVictoriaBrowserEmbedHost()
+    {
+        try
+        {
+            _victoriaBrowserEmbedHost?.Bind(0);
+        }
+        catch
+        {
+            // ignore
+        }
+
+        try
+        {
+            VictoriaBrowserEmbedSlot?.Children.Clear();
+        }
+        catch
+        {
+            // ignore
+        }
+
+        _victoriaBrowserEmbedHost = null;
         if (VictoriaBrowserEmbedSlot is not null)
             VictoriaBrowserEmbedSlot.IsVisible = false;
     }
