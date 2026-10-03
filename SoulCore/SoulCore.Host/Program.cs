@@ -152,6 +152,20 @@ logger.LogInformation(
     soulLoopOptions.Enabled ? "enabled" : "disabled",
     unrealOptions.Enabled ? unrealOptions.WsUrl : "disabled");
 
+var toolsAccess = app.Services.GetRequiredService<SoulCore.Inference.Tools.Desktop.IToolsAccessSettings>();
+var browserBackend = toolsAccess.BrowserBackend;
+logger.LogInformation(
+    "Tools browserBackend={BrowserBackend} desktopTarget={DesktopTarget} (web must use Playwright unless you intentionally set native)",
+    browserBackend,
+    string.IsNullOrWhiteSpace(toolsAccess.DesktopTargetWindowTitle) ? "(none)" : toolsAccess.DesktopTargetWindowTitle);
+if (!SoulCore.Inference.Tools.Desktop.DesktopToolIntent.IsPlaywrightBackend(browserBackend))
+{
+    logger.LogWarning(
+        "BrowserBackend={BrowserBackend} — Victoria will drive VirtualBox / guest Firefox for websites. " +
+        "Remove SOULCORE_Tools__BrowserBackend=native from SoulCore/.env (or set playwright), then restart Host.",
+        browserBackend);
+}
+
 await app.Services.GetRequiredService<IWsFrameAdapter>()
     .StartAsync()
     .ConfigureAwait(false);

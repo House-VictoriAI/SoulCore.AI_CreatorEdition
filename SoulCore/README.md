@@ -100,16 +100,22 @@ dotnet run --project SoulCore.Host -- --soul-loop-tick
 dotnet run --project SoulCore.Host -- --soul-loop-tick --enabled
 ```
 
-## Browser capture (native — no Hermes)
+## Browser (Playwright — default)
 
 | Piece | Path / URL |
 | --- | --- |
-| Bridge | `BrowserCaptureBridge/bridge_server.py` → `http://127.0.0.1:17891/health` |
-| Extension | `BrowserCaptureExtension/` — Chrome/Edge **Load unpacked** |
-| Host backend | `Tools:BrowserBackend=native` (default) → `NativeBrowserBridge` |
-| Start | `SoulCore/scripts/start-browser-bridge.ps1` (also via `ALLSTART.ps1`) |
+| Backend | `Tools:BrowserBackend=playwright` (default) → `PlaywrightBrowserBridge` |
+| Install | `SoulCore/scripts/install-playwright.ps1` → `%LOCALAPPDATA%\ms-playwright\chromium-1148\` |
+| Profile | `%LOCALAPPDATA%\SoulCore\victoria-browser\` |
+| Presence | `GET /browser/view` · embed `GET /browser/embed` when `PlaywrightEmbedPane=true` |
 
-Load unpacked once: `chrome://extensions` → Developer mode → Load unpacked → select repo `BrowserCaptureExtension`. Popup should show bridge connected. SoulCore tools: `browser_health`, `browser_capture_tab`, `browser_click`, `browser_type`, `browser_key`, `browser_scroll`.
+Websites use `browser_navigate` / `browser_*` on Victoria Host Chromium — **not** VirtualBox guest Firefox.
+`DesktopTargetWindowTitle=victoria-sandbox` still scopes **desktop_*** to the VM only.
+
+To force the old guest path (not recommended): `SOULCORE_Tools__BrowserBackend=native` in `SoulCore/.env` then restart Host.
+`.env` overrides `appsettings.json` — a leftover `=native` is why she keeps using the VM.
+
+Legacy BrowserCaptureBridge (`:17891`) remains available when backend is `native` without a VM scope title.
 
 ## Inference / Hermes (quarry loopback)
 ## Inference (Ollama)
@@ -120,8 +126,8 @@ Load unpacked once: `chrome://extensions` → Developer mode → Load unpacked �
 
 When `Inference:Enabled=false`, Host registers a null stub. **Hermes is retired (BED-185)** —
 Host always registers `NullHermesClient`, forces `Hermes:Enabled=false` / `PreferHermes=false`,
-and remaps `BrowserBackend=hermes` → `none`. Open Chrome/websites with `desktop_open_app`
-(chrome + URL). `ALLSTART.ps1` skips the gateway unless `-WithHermes`.
+and remaps `BrowserBackend=hermes` → `none`. Open websites with `browser_navigate`
+(Playwright). `ALLSTART.ps1` skips the gateway unless `-WithHermes`.
 
 ### Ollama Cloud (BED-187) — chat/tools off-box, VRAM free
 
