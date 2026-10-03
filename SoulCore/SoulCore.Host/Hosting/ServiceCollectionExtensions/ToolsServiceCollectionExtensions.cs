@@ -98,13 +98,18 @@ internal static class ToolsServiceCollectionExtensions
         services.AddSingleton<ComputerControlGate>();
         services.AddSingleton<IComputerControlGate>(sp => sp.GetRequiredService<ComputerControlGate>());
         services.AddSingleton<IToolsAccessSettings>(sp => sp.GetRequiredService<ComputerControlGate>());
+        services.AddSingleton<IVictoriaBrowserViewHub, VictoriaBrowserViewHub>();
         services.AddSingleton<IDesktopViewHub>(sp =>
-            new DesktopViewHub(() => sp.GetRequiredService<IToolsAccessSettings>().SoftCursorRestore));
+        {
+            var browser = sp.GetRequiredService<IVictoriaBrowserViewHub>();
+            return new DesktopViewHub(
+                () => sp.GetRequiredService<IToolsAccessSettings>().SoftCursorRestore,
+                mirrorCursor: (x, y, state) => browser.RecordCursor(x, y, state));
+        });
         // PROP-4: honest Presence activity (doing-now), not SoulLoop want slogans.
         services.AddSingleton<SoulCore.Inference.Presence.IPresenceActivityHub>(sp =>
             new SoulCore.Inference.Presence.PresenceActivityHub(sp.GetRequiredService<IDesktopViewHub>()));
         services.AddSingleton<GuestVmBrowserBridgeHolder>();
-        services.AddSingleton<IVictoriaBrowserViewHub, VictoriaBrowserViewHub>();
         services.AddSingleton<IDesktopControlBackend>(sp =>
         {
             IDesktopControlBackend inner;
@@ -150,11 +155,20 @@ internal static class ToolsServiceCollectionExtensions
             sp.GetRequiredService<IDesktopControlBackend>(),
             sp.GetRequiredService<IDesktopViewHub>(),
             sp.GetRequiredService<IVictoriaBrowserViewHub>()));
-        services.AddSingleton<ITool, DesktopClickTool>();
-        services.AddSingleton<ITool, DesktopDragTool>();
+        services.AddSingleton<ITool>(sp => new DesktopClickTool(
+            sp.GetRequiredService<IComputerControlGate>(),
+            sp.GetRequiredService<IDesktopControlBackend>(),
+            sp.GetRequiredService<IDesktopViewHub>()));
+        services.AddSingleton<ITool>(sp => new DesktopDragTool(
+            sp.GetRequiredService<IComputerControlGate>(),
+            sp.GetRequiredService<IDesktopControlBackend>(),
+            sp.GetRequiredService<IDesktopViewHub>()));
         services.AddSingleton<ITool, DesktopTypeTool>();
         services.AddSingleton<ITool, DesktopKeyTool>();
-        services.AddSingleton<ITool, DesktopScrollTool>();
+        services.AddSingleton<ITool>(sp => new DesktopScrollTool(
+            sp.GetRequiredService<IComputerControlGate>(),
+            sp.GetRequiredService<IDesktopControlBackend>(),
+            sp.GetRequiredService<IDesktopViewHub>()));
         services.AddSingleton<ITool, DesktopOpenAppTool>();
         services.AddSingleton<ITool, ListDesktopWindowsTool>();
         services.AddSingleton<ITool, FocusDesktopWindowTool>();

@@ -73,8 +73,16 @@ public sealed class ToolsOptions
     /// <summary>
     /// PROP-14: Presence should SetParent Victoria's headed Chromium HWND into Her screen.
     /// Desk Windows only; Host forces headed when this is true. JPEG/screencast = fallback.
+    /// When <see cref="VmEmbedPane"/> is also true, VM embed wins for Her screen.
     /// </summary>
     public bool PlaywrightEmbedPane { get; set; }
+
+    /// <summary>
+    /// Presence should SetParent the VirtualBox victoria-sandbox window into Her screen.
+    /// Takes precedence over <see cref="PlaywrightEmbedPane"/> when both are true.
+    /// Desk Windows only; leave false in CI.
+    /// </summary>
+    public bool VmEmbedPane { get; set; }
 
     /// <summary>Loopback base URL for native browser capture bridge (default :17891).</summary>
     public string BrowserBridgeUrl { get; set; } = "http://127.0.0.1:17891";

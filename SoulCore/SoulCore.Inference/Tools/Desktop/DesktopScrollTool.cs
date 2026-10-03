@@ -31,11 +31,21 @@ public sealed class DesktopScrollTool : ITool
 
     private readonly IComputerControlGate _gate;
     private readonly IDesktopControlBackend _backend;
+    private readonly IDesktopViewHub? _view;
 
     public DesktopScrollTool(IComputerControlGate gate, IDesktopControlBackend backend)
+        : this(gate, backend, view: null)
+    {
+    }
+
+    public DesktopScrollTool(
+        IComputerControlGate gate,
+        IDesktopControlBackend backend,
+        IDesktopViewHub? view)
     {
         _gate = gate ?? throw new ArgumentNullException(nameof(gate));
         _backend = backend ?? throw new ArgumentNullException(nameof(backend));
+        _view = view;
     }
 
     public ToolDefinition Definition { get; } = new(
@@ -66,7 +76,19 @@ public sealed class DesktopScrollTool : ITool
             deltaX = dxVal;
         }
 
+        await SoftCursorPresenceFeedback.AnnounceAimAsync(_view, x, y, ct).ConfigureAwait(false);
         var result = await _backend.ScrollAsync(x, y, deltaY, deltaX, ct).ConfigureAwait(false);
+        if (result.Success)
+        {
+            // Scroll keeps idle pink at the wheel point (not a click flash).
+            _view?.RecordAction(
+                string.IsNullOrWhiteSpace(result.Content)
+                    ? $"scrolled at ({x},{y})"
+                    : result.Content,
+                x,
+                y);
+        }
+
         return DesktopToolGate.FromBackend(result);
     }
 

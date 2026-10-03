@@ -19,12 +19,20 @@ public sealed class BrowserViewSnapshot
     public string? Detail { get; init; }
     public byte[]? ImageBytes { get; init; }
     public bool EmbedPane { get; init; }
+    public string EmbedSurface { get; init; } = "none";
+    public int? CursorX { get; init; }
+    public int? CursorY { get; init; }
+    public string? CursorState { get; init; }
+    public DateTimeOffset? CursorAt { get; init; }
+    public int FrameWidth { get; init; }
+    public int FrameHeight { get; init; }
 }
 
 public sealed class BrowserEmbedSnapshot
 {
     public bool Reachable { get; init; }
     public string Mode { get; init; } = "disabled";
+    public string Surface { get; init; } = "none";
     public long Hwnd { get; init; }
     public int Pid { get; init; }
     public string? Title { get; init; }
@@ -113,7 +121,14 @@ public sealed class SoulCoreBrowserViewClient : IDisposable
                 UpdatedAt = dto?.UpdatedAt,
                 ImageBytes = imageBytes,
                 Detail = dto?.Note,
-                EmbedPane = dto?.EmbedPane == true
+                EmbedPane = dto?.EmbedPane == true,
+                EmbedSurface = dto?.EmbedSurface ?? "none",
+                CursorX = dto?.CursorX,
+                CursorY = dto?.CursorY,
+                CursorState = dto?.CursorState,
+                CursorAt = dto?.CursorAt,
+                FrameWidth = dto?.FrameWidth ?? 0,
+                FrameHeight = dto?.FrameHeight ?? 0
             };
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
@@ -153,6 +168,7 @@ public sealed class SoulCoreBrowserViewClient : IDisposable
             {
                 Reachable = true,
                 Mode = dto?.Mode ?? "fallback",
+                Surface = dto?.Surface ?? "none",
                 Hwnd = dto?.Hwnd ?? 0,
                 Pid = dto?.Pid ?? 0,
                 Title = dto?.Title,
@@ -195,12 +211,36 @@ public sealed class SoulCoreBrowserViewClient : IDisposable
 
         [JsonPropertyName("embedPane")]
         public bool EmbedPane { get; set; }
+
+        [JsonPropertyName("embedSurface")]
+        public string? EmbedSurface { get; set; }
+
+        [JsonPropertyName("cursorX")]
+        public int? CursorX { get; set; }
+
+        [JsonPropertyName("cursorY")]
+        public int? CursorY { get; set; }
+
+        [JsonPropertyName("cursorState")]
+        public string? CursorState { get; set; }
+
+        [JsonPropertyName("cursorAt")]
+        public DateTimeOffset? CursorAt { get; set; }
+
+        [JsonPropertyName("frameWidth")]
+        public int FrameWidth { get; set; }
+
+        [JsonPropertyName("frameHeight")]
+        public int FrameHeight { get; set; }
     }
 
     private sealed class EmbedDto
     {
         [JsonPropertyName("mode")]
         public string? Mode { get; set; }
+
+        [JsonPropertyName("surface")]
+        public string? Surface { get; set; }
 
         [JsonPropertyName("hwnd")]
         public long Hwnd { get; set; }

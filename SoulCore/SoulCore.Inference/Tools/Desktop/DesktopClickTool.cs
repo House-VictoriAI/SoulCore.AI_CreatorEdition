@@ -5,6 +5,7 @@ namespace SoulCore.Inference.Tools.Desktop;
 /// <summary>
 /// <c>desktop_click</c> — requires session <see cref="IComputerControlGate.AllowComputerControl"/>.
 /// Optional <c>clicks: 2</c> for double-click (BED-174).
+/// Publishes pink→teal soft cursor to Presence Her screen (VM embed).
 /// </summary>
 public sealed class DesktopClickTool : ITool
 {
@@ -32,11 +33,21 @@ public sealed class DesktopClickTool : ITool
 
     private readonly IComputerControlGate _gate;
     private readonly IDesktopControlBackend _backend;
+    private readonly IDesktopViewHub? _view;
 
     public DesktopClickTool(IComputerControlGate gate, IDesktopControlBackend backend)
+        : this(gate, backend, view: null)
+    {
+    }
+
+    public DesktopClickTool(
+        IComputerControlGate gate,
+        IDesktopControlBackend backend,
+        IDesktopViewHub? view)
     {
         _gate = gate ?? throw new ArgumentNullException(nameof(gate));
         _backend = backend ?? throw new ArgumentNullException(nameof(backend));
+        _view = view;
     }
 
     public ToolDefinition Definition { get; } = new(
@@ -79,7 +90,20 @@ public sealed class DesktopClickTool : ITool
         if (clicks is not (1 or 2))
             return new ToolResult(false, "error: desktop_click 'clicks' must be 1 or 2.", null);
 
+        // Pink aim on Her screen before the press (Playwright-parity for VM embed).
+        await SoftCursorPresenceFeedback.AnnounceAimAsync(_view, x, y, ct).ConfigureAwait(false);
+
         var result = await _backend.ClickAsync(x, y, button, clicks, ct).ConfigureAwait(false);
+        if (result.Success)
+        {
+            var label = clicks == 2 ? $"double-clicked {button}" : $"clicked {button}";
+            var note = string.IsNullOrWhiteSpace(result.Content)
+                ? $"{label} at ({x},{y})"
+                : result.Content;
+            await SoftCursorPresenceFeedback.AnnounceClickAsync(_view, note, x, y, ct)
+                .ConfigureAwait(false);
+        }
+
         return DesktopToolGate.FromBackend(result);
     }
 

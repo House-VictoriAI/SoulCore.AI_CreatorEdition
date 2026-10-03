@@ -29,11 +29,21 @@ public sealed class DesktopDragTool : ITool
 
     private readonly IComputerControlGate _gate;
     private readonly IDesktopControlBackend _backend;
+    private readonly IDesktopViewHub? _view;
 
     public DesktopDragTool(IComputerControlGate gate, IDesktopControlBackend backend)
+        : this(gate, backend, view: null)
+    {
+    }
+
+    public DesktopDragTool(
+        IComputerControlGate gate,
+        IDesktopControlBackend backend,
+        IDesktopViewHub? view)
     {
         _gate = gate ?? throw new ArgumentNullException(nameof(gate));
         _backend = backend ?? throw new ArgumentNullException(nameof(backend));
+        _view = view;
     }
 
     public ToolDefinition Definition { get; } = new(
@@ -67,7 +77,17 @@ public sealed class DesktopDragTool : ITool
                 button = s;
         }
 
+        await SoftCursorPresenceFeedback.AnnounceAimAsync(_view, x1, y1, ct).ConfigureAwait(false);
         var result = await _backend.DragAsync(x1, y1, x2, y2, button, ct).ConfigureAwait(false);
+        if (result.Success)
+        {
+            var note = string.IsNullOrWhiteSpace(result.Content)
+                ? $"dragged {button} from ({x1},{y1}) to ({x2},{y2})"
+                : result.Content;
+            await SoftCursorPresenceFeedback.AnnounceClickAsync(_view, note, x2, y2, ct)
+                .ConfigureAwait(false);
+        }
+
         return DesktopToolGate.FromBackend(result);
     }
 

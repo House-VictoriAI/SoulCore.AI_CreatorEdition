@@ -1,5 +1,7 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using House.ChatDesktop.Controls;
 using House.ChatDesktop.Services;
@@ -14,6 +16,18 @@ public partial class MainWindow
     private long _lastEmbedHwnd;
     private string? _lastEmbedMode;
     private VictoriaBrowserEmbedHost? _victoriaBrowserEmbedHost;
+    private int? _browserCursorX;
+    private int? _browserCursorY;
+    private string? _browserCursorState;
+    private DateTimeOffset? _browserCursorAt;
+    private bool _browserCursorLayerHooked;
+
+    // PROP-14.1 palette — match PlaywrightClickCursor IdleHex / ClickHex.
+    private static readonly IBrush SoftCursorIdleStroke = new SolidColorBrush(Color.Parse("#FF2D55"));
+    private static readonly IBrush SoftCursorIdleFill = new SolidColorBrush(Color.Parse("#73FF2D55"));
+    private static readonly IBrush SoftCursorClickStroke = new SolidColorBrush(Color.Parse("#2EC4B6"));
+    private static readonly IBrush SoftCursorClickFill = new SolidColorBrush(Color.Parse("#802EC4B6"));
+    private const int SoftCursorFlashMs = 650; // match Playwright AimDwell so ~5fps polls catch teal
 
     private async Task RefreshVictoriaBrowserViewAsync()
     {
@@ -39,6 +53,8 @@ public partial class MainWindow
     {
         if (VictoriaBrowserActionText is null) return;
 
+        EnsureBrowserCursorLayerHooked();
+
         if (!snap.Reachable)
         {
             VictoriaBrowserActionText.Text = snap.Detail ?? "Host unreachable";
@@ -52,6 +68,7 @@ public partial class MainWindow
 
             ClearVictoriaBrowserImage();
             ClearVictoriaBrowserEmbed("Host unreachable");
+            ClearVictoriaBrowserSoftCursor();
             return;
         }
 
@@ -63,7 +80,9 @@ public partial class MainWindow
         var when = snap.UpdatedAt?.ToLocalTime().ToString("h:mm:ss tt") ?? "-";
         var embedded = embed is { Mode: "embedded", Hwnd: > 0 } && OperatingSystem.IsWindows();
         var modeLabel = embedded
-            ? "embedded"
+            ? (string.IsNullOrWhiteSpace(embed!.Surface) || embed.Surface == "none"
+                ? "embedded"
+                : $"embedded · {embed.Surface}")
             : embed?.Mode is { Length: > 0 } m && m != "disabled"
                 ? m
                 : (snap.Backend ?? "playwright");
@@ -92,6 +111,10 @@ public partial class MainWindow
             }
         }
 
+        // Frame size for soft-cursor mapping (guest framebuffer or last JPEG).
+        if (snap.FrameWidth > 0) _browserImagePixelWidth = snap.FrameWidth;
+        if (snap.FrameHeight > 0) _browserImagePixelHeight = snap.FrameHeight;
+
         if (embedded)
         {
             ApplyVictoriaBrowserEmbed(embed!);
@@ -101,6 +124,7 @@ public partial class MainWindow
             if (VictoriaBrowserEmptyText is not null)
                 VictoriaBrowserEmptyText.IsVisible = false;
             HideVictoriaBrowserCoords();
+            ApplyVictoriaBrowserSoftCursor(snap, embed);
             return;
         }
 
@@ -118,6 +142,8 @@ public partial class MainWindow
         {
             ClearVictoriaBrowserImage();
         }
+
+        ApplyVictoriaBrowserSoftCursor(snap, embed);
     }
 
     private void ApplyVictoriaBrowserEmbed(BrowserEmbedSnapshot embed)
@@ -207,6 +233,91 @@ public partial class MainWindow
         _victoriaBrowserEmbedHost = null;
         if (VictoriaBrowserEmbedSlot is not null)
             VictoriaBrowserEmbedSlot.IsVisible = false;
+    }
+
+    private void ApplyVictoriaBrowserSoftCursor(BrowserViewSnapshot snap, BrowserEmbedSnapshot? embed)
+    {
+        // Playwright DOM + burn-in already paint the cursor — overlay only for VM / guest.
+        var surface = embed?.Surface ?? snap.EmbedSurface;
+        var wants = string.Equals(surface, "vm", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(snap.Backend, "vbox-guest", StringComparison.OrdinalIgnoreCase);
+        if (!wants || snap.CursorX is not int cx || snap.CursorY is not int cy)
+        {
+            ClearVictoriaBrowserSoftCursor();
+            return;
+        }
+
+        _browserCursorX = cx;
+        _browserCursorY = cy;
+        _browserCursorState = snap.CursorState;
+        _browserCursorAt = snap.CursorAt;
+        PositionVictoriaBrowserSoftCursor();
+    }
+
+    private void ClearVictoriaBrowserSoftCursor()
+    {
+        _browserCursorX = null;
+        _browserCursorY = null;
+        _browserCursorState = null;
+        _browserCursorAt = null;
+        if (VictoriaBrowserCursorLayer is not null)
+            VictoriaBrowserCursorLayer.IsVisible = false;
+    }
+
+    private void EnsureBrowserCursorLayerHooked()
+    {
+        if (_browserCursorLayerHooked || VictoriaBrowserSurface is null)
+            return;
+        VictoriaBrowserSurface.SizeChanged += (_, _) => PositionVictoriaBrowserSoftCursor();
+        _browserCursorLayerHooked = true;
+    }
+
+    private void PositionVictoriaBrowserSoftCursor()
+    {
+        var surface = VictoriaBrowserSurface;
+        var layer = VictoriaBrowserCursorLayer;
+        var cursor = VictoriaBrowserCursor;
+        if (surface is null || layer is null || cursor is null)
+            return;
+
+        if (_browserCursorX is not int cx || _browserCursorY is not int cy
+            || _browserImagePixelWidth <= 0 || _browserImagePixelHeight <= 0)
+        {
+            layer.IsVisible = false;
+            return;
+        }
+
+        var bounds = surface.Bounds;
+        if (bounds.Width <= 1 || bounds.Height <= 1)
+        {
+            layer.IsVisible = false;
+            return;
+        }
+
+        // HWND embed fills the slot; JPEG uses Uniform letterbox — same Uniform map either way
+        // when frame size is known (guest framebuffer).
+        var scale = Math.Min(bounds.Width / _browserImagePixelWidth, bounds.Height / _browserImagePixelHeight);
+        var drawW = _browserImagePixelWidth * scale;
+        var drawH = _browserImagePixelHeight * scale;
+        var offsetX = (bounds.Width - drawW) / 2;
+        var offsetY = (bounds.Height - drawH) / 2;
+
+        var flash = string.Equals(_browserCursorState, "click", StringComparison.OrdinalIgnoreCase)
+                    && _browserCursorAt is DateTimeOffset at
+                    && (DateTimeOffset.UtcNow - at).TotalMilliseconds < SoftCursorFlashMs;
+
+        cursor.Stroke = flash ? SoftCursorClickStroke : SoftCursorIdleStroke;
+        cursor.Fill = flash ? SoftCursorClickFill : SoftCursorIdleFill;
+        cursor.Width = flash ? 36 : 28;
+        cursor.Height = flash ? 36 : 28;
+
+        var left = offsetX + (cx * scale) - (cursor.Width / 2);
+        var top = offsetY + (cy * scale) - (cursor.Height / 2);
+        Canvas.SetLeft(cursor, left);
+        Canvas.SetTop(cursor, top);
+        layer.Width = bounds.Width;
+        layer.Height = bounds.Height;
+        layer.IsVisible = true;
     }
 
     private void ShowVictoriaBrowserBitmap(byte[] imageBytes)

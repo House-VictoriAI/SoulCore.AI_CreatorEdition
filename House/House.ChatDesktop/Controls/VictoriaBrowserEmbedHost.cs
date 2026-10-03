@@ -8,7 +8,9 @@ using House.ChatDesktop.Services;
 namespace House.ChatDesktop.Controls;
 
 /// <summary>
-/// PROP-14.2: hosts an existing Win32 HWND (Victoria Playwright Chromium) inside Presence.
+/// PROP-14.2 / VM embed: hosts an existing Win32 HWND (VirtualBox victoria-sandbox or
+/// Playwright Chromium) inside Presence Her screen via SetParent.
+/// Detach restores the prior parent — never DestroyWindow the guest/VM HWND.
 /// Non-Windows / zero hwnd → no native child (JPEG fallback stays visible).
 /// Requires Windows app.manifest with supportedOS (see House.ChatDesktop/app.manifest).
 /// Avalonia NativeControlHost creates a Win32 child on visual-tree attach even when
