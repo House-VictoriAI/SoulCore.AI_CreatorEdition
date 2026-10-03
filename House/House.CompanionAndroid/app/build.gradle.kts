@@ -4,6 +4,24 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+fun readCompanionToken(): String {
+    val env = file("../../../SoulCore/.env")
+    if (!env.exists()) return ""
+    val line = env.readLines().firstOrNull {
+        it.trimStart().startsWith("SOULCORE_COMPANION_API_TOKEN=")
+    } ?: return ""
+    return line.substringAfter("=").trim()
+}
+
+fun asJavaStringLiteral(value: String): String {
+    val escaped = value
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\r", "")
+        .replace("\n", "")
+    return "\"$escaped\""
+}
+
 android {
     namespace = "com.housevictoria.companion"
     compileSdk = 34
@@ -12,9 +30,20 @@ android {
         applicationId = "com.housevictoria.companion"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.2.0-call"
+        versionCode = 2
+        versionName = "0.2.1-link"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Phone default is this PC's Tailscale serve. Loopback stays available from Settings.
+        buildConfigField(
+            "String",
+            "COMPANION_WS_URL",
+            asJavaStringLiteral("wss://kaia-reimagined.tailbf9ec2.ts.net:8443/ws")
+        )
+        buildConfigField(
+            "String",
+            "COMPANION_TOKEN",
+            asJavaStringLiteral(readCompanionToken())
+        )
     }
 
     buildTypes {
@@ -29,6 +58,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {

@@ -37,7 +37,7 @@ public sealed class ComputerControlGate : IComputerControlGate, IToolsAccessSett
             ? ToolsOptions.BackendCua
             : opts.DesktopBackend.Trim();
         BrowserBackend = string.IsNullOrWhiteSpace(opts.BrowserBackend)
-            ? ToolsOptions.BackendNative
+            ? ToolsOptions.BackendPlaywright
             : opts.BrowserBackend.Trim();
         Mt4Backend = string.IsNullOrWhiteSpace(opts.Mt4Backend)
             ? ToolsOptions.BackendLlmod
@@ -63,8 +63,8 @@ public sealed class ComputerControlGate : IComputerControlGate, IToolsAccessSett
         bool allowComputerControl,
         bool allowMt4Read,
         bool allowMt4Trade,
-        string desktopBackend = ToolsOptions.BackendNative,
-        string browserBackend = ToolsOptions.BackendNative,
+        string desktopBackend = ToolsOptions.BackendCua,
+        string browserBackend = ToolsOptions.BackendPlaywright,
         string mt4Backend = ToolsOptions.BackendLlmod,
         bool softCursorRestore = true,
         string desktopTargetWindowTitle = "",

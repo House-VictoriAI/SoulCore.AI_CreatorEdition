@@ -52,12 +52,12 @@ public sealed class ToolsOptions
     public string DesktopTargetWindowTitle { get; set; } = "";
 
     /// <summary>
-    /// Browser backend: <c>playwright</c> (BED-195 — Victoria dedicated Chromium),
-    /// <c>native</c> (BrowserCaptureBridge :17891), or legacy. When
+    /// Browser backend: <c>playwright</c> (default / PROP-14 — Victoria Host Chromium),
+    /// or <c>native</c> (GuestVm / BrowserCaptureBridge :17891). When
     /// <c>playwright</c>, Host prefers it even if DesktopTargetWindowTitle is set
-    /// (VM stays for desktop_*; web Login uses Playwright).
+    /// (VM stays for desktop_* only; web Login uses Playwright).
     /// </summary>
-    public string BrowserBackend { get; set; } = BackendNative;
+    public string BrowserBackend { get; set; } = BackendPlaywright;
 
     public const string BackendPlaywright = "playwright";
 

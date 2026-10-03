@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.housevictoria.companion.BuildConfig
 import com.housevictoria.companion.net.CompanionMediaClient
 
 /**
@@ -80,13 +81,30 @@ object CompanionPrefs {
     fun load(context: Context): CompanionConfig {
         migratePlaintextTokenIfNeeded(context)
         val prefs = plainPrefs(context)
+        val storedWs = prefs.getString(KEY_WS_URL, null)?.trim().orEmpty()
+        val wsUrl = storedWs.ifBlank {
+            BuildConfig.COMPANION_WS_URL.trim().ifBlank { DEFAULT_WS_URL }
+        }
         return CompanionConfig(
-            wsUrl = prefs.getString(KEY_WS_URL, DEFAULT_WS_URL).orEmpty(),
-            token = securePrefs(context).getString(KEY_TOKEN, "").orEmpty(),
+            wsUrl = wsUrl,
+            token = readToken(context).ifBlank { BuildConfig.COMPANION_TOKEN.trim() },
             httpBaseUrl = prefs.getString(KEY_HTTP_BASE, "").orEmpty(),
             contactId = prefs.getString(KEY_CONTACT_ID, DEFAULT_CONTACT_ID).orEmpty()
                 .ifBlank { DEFAULT_CONTACT_ID }
         )
+    }
+
+    /**
+     * Keystore-backed prefs throw on some Samsung firmwares and after a
+     * device-to-device restore. A failure here must not take down the UI.
+     */
+    private fun readToken(context: Context): String {
+        return try {
+            securePrefs(context).getString(KEY_TOKEN, "").orEmpty()
+        } catch (error: Exception) {
+            Log.w(TAG, "Could not read Keystore token; continuing without a stored token", error)
+            ""
+        }
     }
 
     fun save(context: Context, config: CompanionConfig) {
@@ -98,10 +116,14 @@ object CompanionPrefs {
             .apply()
         // Drop any leftover plaintext token from Phase 0 shell.
         plainPrefs(context).edit().remove(KEY_TOKEN).apply()
-        securePrefs(context)
-            .edit()
-            .putString(KEY_TOKEN, config.token.trim())
-            .apply()
+        try {
+            securePrefs(context)
+                .edit()
+                .putString(KEY_TOKEN, config.token.trim())
+                .apply()
+        } catch (error: Exception) {
+            Log.w(TAG, "Could not store token in Keystore", error)
+        }
         Log.d(TAG, "Settings saved (token ${tokenPresence(config.token)})")
     }
 
@@ -165,16 +187,20 @@ object CompanionPrefs {
      * Move into encrypted store and wipe the plaintext key.
      */
     private fun migratePlaintextTokenIfNeeded(context: Context) {
-        val plain = plainPrefs(context)
-        val legacy = plain.getString(KEY_TOKEN, null)
-        if (legacy.isNullOrEmpty()) return
+        try {
+            val plain = plainPrefs(context)
+            val legacy = plain.getString(KEY_TOKEN, null)
+            if (legacy.isNullOrEmpty()) return
 
-        val secure = securePrefs(context)
-        if (secure.getString(KEY_TOKEN, "").isNullOrEmpty()) {
-            secure.edit().putString(KEY_TOKEN, legacy.trim()).apply()
-            Log.i(TAG, "Migrated plaintext token into EncryptedSharedPreferences")
+            val secure = securePrefs(context)
+            if (secure.getString(KEY_TOKEN, "").isNullOrEmpty()) {
+                secure.edit().putString(KEY_TOKEN, legacy.trim()).apply()
+                Log.i(TAG, "Migrated plaintext token into EncryptedSharedPreferences")
+            }
+            plain.edit().remove(KEY_TOKEN).apply()
+        } catch (error: Exception) {
+            Log.w(TAG, "Could not migrate plaintext token", error)
         }
-        plain.edit().remove(KEY_TOKEN).apply()
     }
 
     private fun tokenPresence(token: String): String =
