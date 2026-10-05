@@ -67,6 +67,14 @@ public class EpisodicMemoryPromptTests
     }
 
     [Fact]
+    public void BuildSystemInstruction_UsesActivePersonaDisplayName()
+    {
+        var instruction = EpisodicMemoryPrompt.BuildSystemInstruction("Analyst");
+        Assert.Contains("Analyst's private memory", instruction, StringComparison.Ordinal);
+        Assert.DoesNotContain("Victoria", instruction, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SampleAuthoredMemory_Fixture_IsPlainFirstPersonNotTemplate()
     {
         // Dry-run / QA fixture: shape expected from a successful memory-author call.

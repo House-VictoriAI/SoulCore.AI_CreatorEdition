@@ -62,8 +62,10 @@ public sealed class ToolsOptions
     public const string BackendPlaywright = "playwright";
 
     /// <summary>
-    /// Victoria-only Chromium profile directory. Must NOT be LinearThrone's Chrome/Edge profile.
-    /// Default: %LOCALAPPDATA%\SoulCore\victoria-browser
+    /// Host fallback Chromium profile directory when the active PersonaPack leaves
+    /// <c>PlaywrightProfileDir</c> blank (PROP-15.5). Must NOT be LinearThrone's Chrome/Edge profile.
+    /// When both pack + this are blank, resolver uses <c>{personasRoot}/{personaId}/browser</c>.
+    /// Legacy no-persona default: %LOCALAPPDATA%\SoulCore\victoria-browser.
     /// </summary>
     public string PlaywrightUserDataDir { get; set; } = "";
 

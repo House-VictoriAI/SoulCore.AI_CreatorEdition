@@ -1,7 +1,7 @@
 ---
 type: config
 id: PROP-NUMBERING
-updated: 2026-09-30
+updated: 2026-10-05
 owner: PM-01 / TT-01
 ---
 
@@ -54,6 +54,7 @@ Reconciled against `main` on **2026-09-15**; re-verified **2026-09-27** (see
 | PROP-12-cua-playwright-resolution | Lock web=Playwright / desktop=CUA+VM; ForceTool health companion | **Decided 2026-09-16** — emergency ship; see `docs/agents/reports/PROP-12-PM01-cua-playwright-decision.md` | emergency |
 | PROP-13-playwright-frame-not-leaked-text | Open Playwright to a URL and show the frame; chat must not echo `<execute_tool>` | **BED Pass** 2026-09-29 — Avenue A 13.1–13.3; QA Windows smoke pending | 13.1–13.3 BED |
 | PROP-14-victoria-browser-live-cursor-pane | HWND embed Victoria Chromium + pink→teal click cursor | **In progress** 2026-10-02 — 14.1/14.2 implementing on `cursor/prop14-cursor-hwnd-9531` | 14.1–14.5 |
+| PROP-15-persona-creation-platform | CreatorEdition PersonaPack + quarantine + in-app create | **In progress** — 15.1–15.6/15.8/15.8b/**15.9** Pass; **15.7** F2/F4 await LinearThrone | 15.0–15.9 |
 
 **Report-only splits (PROP-7…11).** No `PROP-7.1`…`PROP-11.1` ticket files exist. Each shipped
 straight off its proposal + intake and filed a `PROP-{N}.1-BED01-to-PM01.md` Pass report. Recorded
@@ -64,7 +65,7 @@ Cluster map (closed): `docs/archive/proposals/architecture-eval-backlog-cluster-
 Program accept (closed): `docs/archive/tasks/PROP-5-11-PM01-program-accept.md`  
 Scoreboard: `docs/agents/reports/PROP-5-11-TINA-wipeout-final.md`
 
-Next free `N`: **15**.
+Next free `N`: **16**.
 
 ## Open items (not on `main`)
 
@@ -79,6 +80,17 @@ Next free `N`: **15**.
 | **PROP-3** | — | Parked until SMS QA Pass |
 | **PROP-13** | BED-01 | Ticketed 2026-09-29. Avenue A: 13.1 intent+URL, 13.2 reply firewall, 13.3 capture gate + private-host reject. |
 | **PROP-14** | BED/FED | **In progress** — 14.1 cursor + 14.2 HWND embed on `cursor/prop14-cursor-hwnd-9531`; Windows Home PC smoke still needed |
+| **PROP-15.1** | BED-01 | PersonaPack spine — **Pass** (`docs/agents/reports/PROP-15.1-BED01-to-PM01.md`) |
+| **PROP-15.2** | BED-01 | Per-persona quarantined stores — **Pass** |
+| **PROP-15.3** | FED-01 | In-app create/edit wizard — **Pass (client)**; live API smoke → Host restart + 15.6 |
+| **PROP-15.4** | FED-01 | Switcher + de-brand — **Pass (client)**; desk API smoke → Host restart + 15.6 |
+| **PROP-15.5** | BED-01 | VM/tool paths per pack — **Pass** (`docs/agents/reports/PROP-15.5-BED01-to-PM01.md`) |
+| **PROP-15.6** | QA-01 | E2E desk smoke — **Pass** (`PROP-15.6-QA01-to-PM01.md`) |
+| **PROP-15.6b** | OPS-HOME | Recycle `:7700` — **Pass** (`PROP-15.6b-OPSHOME-to-PM01.md`) |
+| **PROP-15.7** | SLOP-01 | Post-QA slop — **findings** (`PROP-15.7-SLOP01-to-PM01.md`); F2/F4 await LinearThrone |
+| **PROP-15.8** | BED-01 | Starter pack vmWindowTitle refresh — **Pass** (`PROP-15.8-BED01-to-PM01.md`) |
+| **PROP-15.8b** | OPS-HOME | Recycle `:7700` for seed merge — **Pass** (`PROP-15.8b-OPSHOME-to-PM01.md`) |
+| **PROP-15.9** | BED-01 | SLOP F1 NormalizeId dedupe — **Pass** (`PROP-15.9-BED01-to-PM01.md`) |
 
 Legacy non-PROP tickets still Pending: `TASK-123`, `TASK-137`, `TASK-139` (QA gates),
 `TASK-191` (Partial) / `TASK-192` (Queued) under REX.

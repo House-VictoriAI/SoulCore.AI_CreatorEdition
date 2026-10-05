@@ -13,12 +13,24 @@ public static class EpisodicMemoryPrompt
     public const int AuthorMaxTokens = 96;
 
     /// <summary>
-    /// System/instruction for Victoria’s private memory of one exchange.
+    /// Legacy default instruction (Victoria starter). Prefer
+    /// <see cref="BuildSystemInstruction"/> with the active pack display name.
     /// </summary>
-    public const string SystemInstruction =
-        "Write 1–3 first-person sentences as Victoria’s private memory of this exchange. " +
-        "No meta, no quotes of the full reply. Past tense. " +
-        "Do not invent facts not present in the exchange.";
+    public static string SystemInstruction => BuildSystemInstruction("Victoria");
+
+    /// <summary>
+    /// System/instruction for the active persona’s private memory of one exchange.
+    /// </summary>
+    public static string BuildSystemInstruction(string personaDisplayName)
+    {
+        var name = string.IsNullOrWhiteSpace(personaDisplayName)
+            ? "the companion"
+            : personaDisplayName.Trim();
+        return
+            $"Write 1–3 first-person sentences as {name}'s private memory of this exchange. " +
+            "No meta, no quotes of the full reply. Past tense. " +
+            "Do not invent facts not present in the exchange.";
+    }
 
     private const string UserLabel = "User said:\n";
     private const string ReplyLabel = "\n\nI replied:\n";

@@ -77,8 +77,16 @@ public class ChatWebSocketHandlerToolLoopTests
 
         var chatOpts = Options.Create(chatOptions ?? MakeChatOptions());
         var infOpts = Options.Create(MakeInferenceOptions());
+        // Match Host appsettings BrowserBackend=native (VM-primary). Playwright default
+        // on the short test ctor forces browser_navigate for "open Chrome" and breaks VM NL tests.
         var tools = toolsAccess
-            ?? new ComputerControlGate(allowDesktopCapture: true, allowComputerControl: true);
+            ?? new ComputerControlGate(
+                allowDesktopCapture: true,
+                allowBrowserCapture: true,
+                allowComputerControl: true,
+                allowMt4Read: false,
+                allowMt4Trade: false,
+                browserBackend: ToolsOptions.BackendNative);
 
         var contextBuilder = new ChatContextBuilder(
             memory,
@@ -86,6 +94,7 @@ public class ChatWebSocketHandlerToolLoopTests
             charter,
             emotion,
             tools,
+            new SoulCore.Host.Persona.FixedBlankPersonaSession(),
             loggerFactory.CreateLogger<ChatContextBuilder>());
 
         var emotionSnapshot = new EmotionSnapshotSender(
@@ -285,6 +294,7 @@ public class ChatWebSocketHandlerToolLoopTests
             allowComputerControl: true,
             allowMt4Read: false,
             allowMt4Trade: false,
+            browserBackend: ToolsOptions.BackendNative,
             desktopTargetWindowTitle: "victoria-sandbox");
         var handler = MakeHandler(
             inference, registry, unreal, MakeChatOptions(useToolLoop: true),

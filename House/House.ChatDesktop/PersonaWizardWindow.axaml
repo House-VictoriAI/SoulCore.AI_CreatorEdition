@@ -1,0 +1,113 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="House.ChatDesktop.PersonaWizardWindow"
+        Title="Persona wizard"
+        Width="560" Height="640"
+        MinWidth="480" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True"
+        Background="{DynamicResource BgBrush}"
+        Foreground="{DynamicResource TextBrush}"
+        SystemDecorations="BorderOnly">
+  <DockPanel Margin="20">
+    <DockPanel DockPanel.Dock="Bottom" Margin="0,16,0,0">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button x:Name="CancelButton" Classes="ghost" Content="Cancel" MinWidth="88" Click="Cancel_Click"/>
+        <Button x:Name="BackButton" Classes="ghost" Content="Back" MinWidth="88" IsVisible="False" Click="Back_Click"/>
+        <Button x:Name="NextButton" Classes="primary" Content="Next" MinWidth="88" Click="Next_Click"/>
+        <Button x:Name="SaveButton" Classes="primary" Content="Save" MinWidth="88" IsVisible="False" Click="Save_Click"/>
+      </StackPanel>
+      <TextBlock x:Name="StatusText" FontSize="11" Foreground="{DynamicResource MutedBrush}"
+                 TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/>
+    </DockPanel>
+
+    <StackPanel>
+      <TextBlock x:Name="TitleText" Text="Create persona" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,4"/>
+      <TextBlock x:Name="StepHintText" FontSize="12" Foreground="{DynamicResource MutedBrush}"
+                 TextWrapping="Wrap" Margin="0,0,0,12"
+                 Text="Step 1 — pick a template. Blank needs no Victoria pack."/>
+
+      <!-- Step 0: template gallery (create only) -->
+      <StackPanel x:Name="TemplateStep" Spacing="8">
+        <ListBox x:Name="TemplateList" MaxHeight="360" SelectionChanged="TemplateList_SelectionChanged">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Spacing="2" Margin="4">
+                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding Description}" FontSize="11"
+                           Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"/>
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </StackPanel>
+
+      <!-- Step 1: identity -->
+      <StackPanel x:Name="IdentityStep" Spacing="6" IsVisible="False">
+        <TextBlock Text="Display name" Foreground="{DynamicResource MutedBrush}"/>
+        <TextBox x:Name="DisplayNameBox" Classes="input" MaxLength="64" Height="36"
+                 VerticalContentAlignment="Center" Padding="8,0" TextChanged="DisplayNameBox_TextChanged"/>
+        <TextBlock Text="Persona id (Host key)" Foreground="{DynamicResource MutedBrush}" Margin="0,8,0,0"/>
+        <TextBox x:Name="PersonaIdBox" Classes="input" MaxLength="64" Height="36"
+                 VerticalContentAlignment="Center" Padding="8,0"/>
+        <TextBlock Text="Human address (how the persona speaks to the operator)"
+                   Foreground="{DynamicResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+        <TextBox x:Name="HumanAddressBox" Classes="input" MaxLength="64" Height="36"
+                 VerticalContentAlignment="Center" Padding="8,0"/>
+      </StackPanel>
+
+      <!-- Step 2: trait scales -->
+      <StackPanel x:Name="TraitsStep" Spacing="4" IsVisible="False">
+        <Grid ColumnDefinitions="120,*,48" Margin="0,2">
+          <TextBlock Text="Warmth" VerticalAlignment="Center"/>
+          <Slider x:Name="WarmthSlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0.5" Margin="8,0"/>
+          <TextBlock Grid.Column="2" Text="{Binding #WarmthSlider.Value, StringFormat='{}{0:0.00}'}"
+                     VerticalAlignment="Center" HorizontalAlignment="Right"/>
+        </Grid>
+        <Grid ColumnDefinitions="120,*,48" Margin="0,2">
+          <TextBlock Text="Directness" VerticalAlignment="Center"/>
+          <Slider x:Name="DirectnessSlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0.5" Margin="8,0"/>
+          <TextBlock Grid.Column="2" Text="{Binding #DirectnessSlider.Value, StringFormat='{}{0:0.00}'}"
+                     VerticalAlignment="Center" HorizontalAlignment="Right"/>
+        </Grid>
+        <Grid ColumnDefinitions="120,*,48" Margin="0,2">
+          <TextBlock Text="Formality" VerticalAlignment="Center"/>
+          <Slider x:Name="FormalitySlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0.5" Margin="8,0"/>
+          <TextBlock Grid.Column="2" Text="{Binding #FormalitySlider.Value, StringFormat='{}{0:0.00}'}"
+                     VerticalAlignment="Center" HorizontalAlignment="Right"/>
+        </Grid>
+        <Grid ColumnDefinitions="120,*,48" Margin="0,2">
+          <TextBlock Text="Playfulness" VerticalAlignment="Center"/>
+          <Slider x:Name="PlayfulnessSlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0.5" Margin="8,0"/>
+          <TextBlock Grid.Column="2" Text="{Binding #PlayfulnessSlider.Value, StringFormat='{}{0:0.00}'}"
+                     VerticalAlignment="Center" HorizontalAlignment="Right"/>
+        </Grid>
+        <Grid ColumnDefinitions="120,*,48" Margin="0,2">
+          <TextBlock Text="Boundaries" VerticalAlignment="Center"/>
+          <Slider x:Name="BoundarySlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0.5" Margin="8,0"/>
+          <TextBlock Grid.Column="2" Text="{Binding #BoundarySlider.Value, StringFormat='{}{0:0.00}'}"
+                     VerticalAlignment="Center" HorizontalAlignment="Right"/>
+        </Grid>
+        <Grid ColumnDefinitions="120,*,48" Margin="0,2">
+          <TextBlock Text="Recall bias" VerticalAlignment="Center"/>
+          <Slider x:Name="RecallSlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0.5" Margin="8,0"/>
+          <TextBlock Grid.Column="2" Text="{Binding #RecallSlider.Value, StringFormat='{}{0:0.00}'}"
+                     VerticalAlignment="Center" HorizontalAlignment="Right"/>
+        </Grid>
+        <TextBlock x:Name="BandPreviewText" FontSize="11" Foreground="{DynamicResource MutedBrush}"
+                   TextWrapping="Wrap" Margin="0,8,0,0"/>
+      </StackPanel>
+
+      <!-- Step 3: charter / identity blurb + quarantine -->
+      <StackPanel x:Name="CharterStep" Spacing="8" IsVisible="False">
+        <TextBlock Text="Identity / charter seed" Foreground="{DynamicResource MutedBrush}"/>
+        <TextBox x:Name="IdentityBlurbBox" Classes="input" AcceptsReturn="True" TextWrapping="Wrap"
+                 MinHeight="160" Padding="10"/>
+        <TextBlock x:Name="QuarantineNoticeText" FontSize="12" TextWrapping="Wrap"
+                   Foreground="{DynamicResource MutedBrush}"/>
+        <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}"
+                   Text="Saves via Host /api/personas. Live trait and charter edits apply on the next chat turn."/>
+      </StackPanel>
+    </StackPanel>
+  </DockPanel>
+</Window>

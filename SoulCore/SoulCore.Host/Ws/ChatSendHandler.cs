@@ -6,6 +6,7 @@ using SoulCore.Adapters.Ws;
 using SoulCore.Config;
 using SoulCore.Core;
 using SoulCore.Core.Abstractions;
+using SoulCore.Core.Persona;
 using SoulCore.Core.Safety;
 using SoulCore.Inference.Clients;
 using SoulCore.Inference.Tooling;
@@ -16,6 +17,7 @@ using SoulCore.Inference.Tools.Body;
 using SoulCore.Inference.Tools.ChiefArchitect;
 using SoulCore.Inference.Tools.Trading;
 using SoulCore.Inference.Tools.Workflow;
+using SoulCore.Host.Persona;
 using SoulCore.Memory;
 using SoulCore.Protocol;
 
@@ -39,6 +41,8 @@ public sealed class ChatSendHandler
     private readonly ChatWsOptions _chatOptions;
     private readonly InferenceOptions _inferenceOptions;
     private readonly IToolsAccessSettings _toolsAccess;
+    private readonly IPersonaToolPathsResolver? _toolPaths;
+    private readonly IPersonaSession _personaSession;
     private readonly IPresenceActivityHub? _presenceActivity;
     private readonly IChatTranscriptStore? _transcript;
     private readonly ILogger<ChatSendHandler> _logger;
@@ -57,8 +61,10 @@ public sealed class ChatSendHandler
         IOptions<InferenceOptions> inferenceOptions,
         IToolsAccessSettings toolsAccess,
         ILogger<ChatSendHandler> logger,
+        IPersonaSession? personaSession = null,
         IPresenceActivityHub? presenceActivity = null,
-        IChatTranscriptStore? transcript = null)
+        IChatTranscriptStore? transcript = null,
+        IPersonaToolPathsResolver? toolPaths = null)
     {
         _inference = inference ?? throw new ArgumentNullException(nameof(inference));
         _memory = memory ?? throw new ArgumentNullException(nameof(memory));
@@ -73,8 +79,10 @@ public sealed class ChatSendHandler
         _inferenceOptions = inferenceOptions?.Value ?? throw new ArgumentNullException(nameof(inferenceOptions));
         _toolsAccess = toolsAccess ?? throw new ArgumentNullException(nameof(toolsAccess));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _personaSession = personaSession ?? new FixedBlankPersonaSession();
         _presenceActivity = presenceActivity;
         _transcript = transcript;
+        _toolPaths = toolPaths;
     }
 
     public async Task HandleAsync(
@@ -106,11 +114,14 @@ public sealed class ChatSendHandler
         await _emotionSnapshot.SendAsync(socket, frame.Id, cancellationToken).ConfigureAwait(false);
 
         var useToolLoop = _chatOptions.UseToolLoop;
+        // PROP-15.5: pack VmWindowTitle wins over Host Tools:DesktopTargetWindowTitle.
+        var desktopTarget = _toolPaths?.ResolveDesktopTargetWindowTitle()
+            ?? _toolsAccess.DesktopTargetWindowTitle;
         var chatContext = await _contextBuilder
             .BuildAsync(
                 modelUserText,
                 useToolLoop,
-                _toolsAccess.DesktopTargetWindowTitle,
+                desktopTarget,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -321,7 +332,8 @@ public sealed class ChatSendHandler
         CancellationToken cancellationToken)
     {
         var template = EpisodicMemoryPrompt.BuildTemplateFallback(userText, assistantReply);
-        var system = EpisodicMemoryPrompt.SystemInstruction;
+        var personaName = _personaSession.GetActive().DisplayName;
+        var system = EpisodicMemoryPrompt.BuildSystemInstruction(personaName);
         var userPayload = EpisodicMemoryPrompt.BuildUserPayload(userText, assistantReply);
 
         try

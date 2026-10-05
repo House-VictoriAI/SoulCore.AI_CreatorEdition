@@ -83,6 +83,8 @@ builder.Services.Configure<ToolsOptions>(
     builder.Configuration.GetSection(ToolsOptions.SectionName));
 builder.Services.Configure<EmailOptions>(
     builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.Configure<PersonaOptions>(
+    builder.Configuration.GetSection(PersonaOptions.SectionName));
 
 var bindOptions = builder.Configuration
     .GetSection(HostBindOptions.SectionName)
@@ -108,10 +110,6 @@ var soulLoopOptions = builder.Configuration
     .GetSection(SoulLoopOptions.SectionName)
     .Get<SoulLoopOptions>() ?? new SoulLoopOptions();
 
-var memoryOptions = builder.Configuration
-    .GetSection(MemoryOptions.SectionName)
-    .Get<MemoryOptions>() ?? new MemoryOptions();
-
 var safetyOptions = builder.Configuration
     .GetSection(SafetyOptions.SectionName)
     .Get<SafetyOptions>() ?? new SafetyOptions();
@@ -127,7 +125,8 @@ if (!IsLoopback(bindOptions.BindAddress))
 builder.WebHost.UseUrls($"http://{bindOptions.BindAddress}:{bindOptions.Port}");
 
 builder.Services
-    .AddMemory(memoryOptions, safetyOptions)
+    .AddPersonaRuntime()
+    .AddMemory(safetyOptions)
     .AddInference(inferenceOptions)
     .AddTools()
     .AddCompanion(unrealOptions)
@@ -142,22 +141,36 @@ if (!wsPath.StartsWith('/'))
     wsPath = "/" + wsPath;
 
 var logger = app.Logger;
+var personaOptions = builder.Configuration
+    .GetSection(PersonaOptions.SectionName)
+    .Get<PersonaOptions>() ?? new PersonaOptions();
+var bootPersonaId = string.IsNullOrWhiteSpace(personaOptions.DefaultActivePersonaId)
+    ? "blank"
+    : personaOptions.DefaultActivePersonaId.Trim();
+var bootMemoryPath = PersonaMemoryPaths.ResolveMemoryDbPath(
+    personaOptions.ResolveRootDirectory(),
+    bootPersonaId);
 logger.LogInformation(
-    "SoulCore.Host listening on http://{Address}:{Port} (health: /health, ws: {WsPath}); memory={MemoryPath}; inference={Inference}; soulLoop={SoulLoop}; unreal={Unreal}",
+    "SoulCore.Host listening on http://{Address}:{Port} (health: /health, ws: {WsPath}); memory={MemoryPath} (persona-scoped); inference={Inference}; soulLoop={SoulLoop}; unreal={Unreal}",
     bindOptions.BindAddress,
     bindOptions.Port,
     wsPath,
-    app.Services.GetRequiredService<IMemoryStore>().DatabasePath,
+    bootMemoryPath,
     inferenceOptions.Enabled ? "ollama" : "null",
     soulLoopOptions.Enabled ? "enabled" : "disabled",
     unrealOptions.Enabled ? unrealOptions.WsUrl : "disabled");
 
 var toolsAccess = app.Services.GetRequiredService<SoulCore.Inference.Tools.Desktop.IToolsAccessSettings>();
+var toolPaths = app.Services.GetService<SoulCore.Core.Persona.IPersonaToolPathsResolver>();
 var browserBackend = toolsAccess.BrowserBackend;
+var resolvedDesktopTarget = toolPaths?.ResolveDesktopTargetWindowTitle()
+    ?? toolsAccess.DesktopTargetWindowTitle;
+var resolvedPwProfile = toolPaths?.ResolvePlaywrightUserDataDir();
 logger.LogInformation(
-    "Tools browserBackend={BrowserBackend} desktopTarget={DesktopTarget} (web must use Playwright unless you intentionally set native)",
+    "Tools browserBackend={BrowserBackend} desktopTarget={DesktopTarget} playwrightProfile={PlaywrightProfile} (web must use Playwright unless you intentionally set native)",
     browserBackend,
-    string.IsNullOrWhiteSpace(toolsAccess.DesktopTargetWindowTitle) ? "(none)" : toolsAccess.DesktopTargetWindowTitle);
+    string.IsNullOrWhiteSpace(resolvedDesktopTarget) ? "(none)" : resolvedDesktopTarget,
+    string.IsNullOrWhiteSpace(resolvedPwProfile) ? "(legacy)" : resolvedPwProfile);
 if (!SoulCore.Inference.Tools.Desktop.DesktopToolIntent.IsPlaywrightBackend(browserBackend))
 {
     logger.LogWarning(

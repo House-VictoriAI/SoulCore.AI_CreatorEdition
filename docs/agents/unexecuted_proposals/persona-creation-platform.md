@@ -1,6 +1,6 @@
 ---
 type: proposal
-status: sent-to-pm
+status: accepted-pm-ticketed
 tt_id: TT-01
 prop_id: PROP-15-persona-creation-platform
 created: 2026-10-05
@@ -13,7 +13,17 @@ related:
   - Agents/AGENTS.md
 sent_at: 2026-10-05
 pm_intake: docs/agents/tasks/PROP-15-TT01-to-PM01.md
-kurt_locks:
+pm_tickets:
+  - docs/agents/tasks/PROP-15.0-PM01-routing.md
+  - docs/agents/tasks/PROP-15.1-PM01-to-BED01.md
+  - docs/agents/tasks/PROP-15.2-PM01-to-BED01.md
+  - docs/agents/tasks/PROP-15.3-PM01-to-FED01.md
+  - docs/agents/tasks/PROP-15.4-PM01-to-FED01.md
+  - docs/agents/tasks/PROP-15.5-PM01-to-BED01.md
+  - docs/agents/tasks/PROP-15.6-PM01-to-QA01.md
+pm_route: B+
+pm_accepted_at: 2026-10-05
+operator_locks:
   fork_repo: https://github.com/House-VictoriAI/SoulCore.AI_CreatorEdition
   concurrency_v1: single-active-persona
   concurrency_future: multi-simultaneous-framed
@@ -28,7 +38,7 @@ kurt_locks:
 
 ## 1. Need / Want
 
-Kurt wants a **Creator Edition** of SoulCore where operators **create and tune personas in-app**, each with its own brain, templates, and trait scales — not a hardwired Victoria appliance.
+LinearThrone wants a **Creator Edition** of SoulCore where operators **create and tune personas in-app**, each with its own brain, templates, and trait scales — not a hardwired Victoria appliance.
 
 ## 2. Goal & Success Criteria
 
@@ -51,7 +61,7 @@ Kurt wants a **Creator Edition** of SoulCore where operators **create and tune p
 
 ## 4. Clarifying Q&A — **LOCKED 2026-10-05**
 
-| # | Kurt lock |
+| # | LinearThrone lock |
 | --- | --- |
 | **Q1 Fork** | Exists: `https://github.com/House-VictoriAI/SoulCore.AI_CreatorEdition`. All PROP-15 execution lands there. |
 | **Q2 Concurrency** | **v1 = single active persona.** Frame APIs/session/Host for **future multi-simultaneous** brains (switcher + persona-scoped resources now; no concurrent HWND/VM required in v1). |
@@ -71,7 +81,7 @@ Answers are sufficient for send-to-PM.
 
 | ID | Avenue | Notes |
 | --- | --- | --- |
-| **B+** | Persona Pack + **per-persona store quarantine** + in-app creator + VM/tool paths scoped to active pack | **Recommended (locked)** |
+| **B+** | Persona Pack + **per-persona store quarantine** + in-app creator + VM/tool paths scoped to active pack | **Recommended (locked) — PM accepted** |
 | A | Shared DB + `persona_id` only | Too weak for “total quarantine”; may use as index *inside* a persona file, not across personas |
 | C | Process-per-brain day one | Park until multi-simultaneous ships |
 | D | Big-bang rewrite | **Rejected** |
@@ -112,7 +122,7 @@ Answers are sufficient for send-to-PM.
 - In-tree platform mode on LinearThrone main (superseded by existing fork)
 - Shared house memory table in v1
 - Ops-only persona YAML without UI
-- Chat-only MVP without VM/tooling (superseded by Kurt lock)
+- Chat-only MVP without VM/tooling (superseded by operator lock)
 
 ## 9. Risks & Kill Criteria
 
@@ -140,3 +150,9 @@ Answers are sufficient for send-to-PM.
   - **Later** — multi-simultaneous; MCP shared-memory server; Metahuman body
 
 **TT recommendation:** Sent to PM-01 2026-10-05. Execution on **CreatorEdition**. Intake: `docs/agents/tasks/PROP-15-TT01-to-PM01.md`.
+
+## 11. PM accept (2026-10-05)
+
+- **Route:** Avenue **B+** accepted as written.
+- **Owner split adjustment:** 15.3 → **FED-01** primary (wizard UI); trait-band compiler + pack persist live in **15.1**; 15.5 → **BED-01** primary with Windows desk smoke evidence (OPS-HOME if needed).
+- **First handoff:** PROP-15.1 → BED-01.

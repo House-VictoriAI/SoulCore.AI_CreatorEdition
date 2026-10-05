@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SoulCore.Adapters.Ws;
 using SoulCore.Config;
+using SoulCore.Core.Persona;
 using SoulCore.Host.Ws;
 using SoulCore.Memory;
 
@@ -26,22 +27,21 @@ public static class CompanionApiEndpoints
         var group = app.MapGroup("/api/companion/v1")
             .AddEndpointFilter(CompanionAuthFilter);
 
-        group.MapGet("/contacts", (IConfiguration config) =>
+        group.MapGet("/contacts", async (IPersonaPackStore packs, IPersonaSession session, CancellationToken ct) =>
         {
-            var opts = config.GetSection(CompanionOptions.SectionName).Get<CompanionOptions>()
-                ?? new CompanionOptions();
+            var list = await packs.ListAsync(ct).ConfigureAwait(false);
+            var activeId = session.ActivePersonaId;
             return Results.Json(new
             {
-                contacts = new[]
+                activePersonaId = activeId,
+                contacts = list.Select(p => new
                 {
-                    new
-                    {
-                        id = opts.DefaultContactId,
-                        name = opts.DefaultContactName,
-                        isPrimary = true,
-                        description = "Victoria (SoulCore). Extra personas reserved for a future external service."
-                    }
-                }
+                    id = p.ContactId,
+                    personaId = p.PersonaId,
+                    name = p.DisplayName,
+                    isPrimary = string.Equals(p.PersonaId, activeId, StringComparison.OrdinalIgnoreCase),
+                    description = $"PersonaPack '{p.PersonaId}' (CreatorEdition)."
+                })
             });
         });
 

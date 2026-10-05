@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using SoulCore.Core;
 using SoulCore.Core.Abstractions;
+using SoulCore.Core.Persona;
 using SoulCore.Inference.Clients;
 using SoulCore.Inference.Tooling;
 using SoulCore.Inference.Tools.Body;
@@ -17,6 +18,7 @@ namespace SoulCore.Host.Ws;
 /// <summary>
 /// Single prompt composition owner: parallel independent context reads →
 /// deterministic [Identity] → [Memory] → [SoulCore emotion] (+ tool guidance).
+/// Active <see cref="IPersonaSession"/> pack is read per turn (live adjust = next turn).
 /// </summary>
 public sealed class ChatContextBuilder : IChatContextBuilder
 {
@@ -31,6 +33,7 @@ public sealed class ChatContextBuilder : IChatContextBuilder
     private readonly ICharter _charter;
     private readonly IEmotionState _emotion;
     private readonly IToolsAccessSettings _toolsAccess;
+    private readonly IPersonaSession _personaSession;
     private readonly ILogger<ChatContextBuilder> _logger;
 
     public ChatContextBuilder(
@@ -39,6 +42,7 @@ public sealed class ChatContextBuilder : IChatContextBuilder
         ICharter charter,
         IEmotionState emotion,
         IToolsAccessSettings toolsAccess,
+        IPersonaSession personaSession,
         ILogger<ChatContextBuilder> logger)
     {
         _memory = memory ?? throw new ArgumentNullException(nameof(memory));
@@ -46,6 +50,7 @@ public sealed class ChatContextBuilder : IChatContextBuilder
         _charter = charter ?? throw new ArgumentNullException(nameof(charter));
         _emotion = emotion ?? throw new ArgumentNullException(nameof(emotion));
         _toolsAccess = toolsAccess ?? throw new ArgumentNullException(nameof(toolsAccess));
+        _personaSession = personaSession ?? throw new ArgumentNullException(nameof(personaSession));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -57,6 +62,9 @@ public sealed class ChatContextBuilder : IChatContextBuilder
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userText);
+
+        // Live adjust = next turn: read active pack at build time (not mid-inference).
+        var pack = _personaSession.GetActive();
 
         // PROP-8.4 / PROP-5 gate: independent reads run in parallel; each piece
         // is assembled into one immutable ChatContext afterward.
@@ -71,12 +79,13 @@ public sealed class ChatContextBuilder : IChatContextBuilder
         var emotionPreamble = await emotionTask.ConfigureAwait(false);
 
         _logger.LogDebug(
-            "Chat context loaded: memories={MemoryCount} identity={IdentityCount} emotionChars={EmotionLen}",
+            "Chat context loaded: persona={PersonaId} memories={MemoryCount} identity={IdentityCount} emotionChars={EmotionLen}",
+            pack.PersonaId,
             recentMemories.Count,
             identityAnchors.Count,
             emotionPreamble.Length);
 
-        var preamble = BuildContextPreamble(identityAnchors, recentMemories, emotionPreamble);
+        var preamble = BuildContextPreamble(identityAnchors, recentMemories, emotionPreamble, pack);
 
         if (useToolLoop)
         {
@@ -88,23 +97,26 @@ public sealed class ChatContextBuilder : IChatContextBuilder
             preamble = HomeBodyGuidance.AppendToPreamble(preamble);
             preamble = ChiefArchitectGuidance.AppendToPreamble(preamble);
             preamble = EmailGuidance.AppendToPreamble(preamble);
+            preamble = PersonaPromptBlocks.AppendToolGuidance(preamble, pack);
         }
 
-        return new ChatContext(preamble, identityAnchors, recentMemories, emotionPreamble);
+        return new ChatContext(preamble, identityAnchors, recentMemories, emotionPreamble, pack.PersonaId);
     }
 
     /// <summary>
     /// Combines charter identity anchors, recent episodic memories, and the emotion
-    /// preamble into a single deterministic system preamble.
+    /// preamble into a single deterministic system preamble for the active pack.
     /// </summary>
     public static string BuildContextPreamble(
         IReadOnlyList<string> identityAnchors,
         IReadOnlyList<string> recentMemories,
-        string emotionPreamble)
+        string emotionPreamble,
+        PersonaPack? pack = null)
     {
         ArgumentNullException.ThrowIfNull(emotionPreamble);
+        pack ??= PersonaPack.CreateBlank();
 
-        var identityBlock = BuildIdentityBlock(identityAnchors);
+        var identityBlock = BuildIdentityBlock(identityAnchors, pack);
         var (memoryBlock, droppedMemoryCount) = BuildMemoryBlock(
             recentMemories,
             ContextPreambleCharLimit - identityBlock.Length);
@@ -208,14 +220,18 @@ public sealed class ChatContextBuilder : IChatContextBuilder
             .ConfigureAwait(false);
     }
 
-    private static string BuildIdentityBlock(IReadOnlyList<string> identityAnchors)
+    /// <summary>Builds the [Identity] section from pack directives + charter anchors.</summary>
+    public static string BuildIdentityBlock(IReadOnlyList<string> identityAnchors, PersonaPack pack)
     {
-        var sb = new StringBuilder(512);
+        ArgumentNullException.ThrowIfNull(pack);
+
+        var sb = new StringBuilder(768);
         sb.Append("[Identity]\n");
-        // Standing address rule (Agents/AGENTS.md): Victoria-facing name for the human is Kayleigh.
-        sb.Append(
-            "The human you are with is Kayleigh. Address them as Kayleigh only; " +
-            "if memory or history uses any other personal name for them, ignore it.");
+        sb.Append(PersonaPromptBlocks.BuildIdentityHeader(pack));
+        sb.Append('\n');
+        sb.Append(PersonaPromptBlocks.BuildHumanAddressRule(pack.HumanAddress));
+        sb.Append('\n');
+        sb.Append(PersonaTraitCompiler.Compile(pack));
         if (identityAnchors is { Count: > 0 })
         {
             foreach (var anchor in identityAnchors)

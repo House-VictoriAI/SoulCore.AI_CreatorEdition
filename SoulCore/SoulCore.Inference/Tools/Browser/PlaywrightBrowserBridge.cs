@@ -4,11 +4,13 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Playwright;
 using SoulCore.Config;
+using SoulCore.Core.Persona;
 
 namespace SoulCore.Inference.Tools.Browser;
 
 /// <summary>
-/// BED-195 Avenue A1: Host Playwright Chromium with Victoria-only user-data-dir.
+/// BED-195 Avenue A1: Host Playwright Chromium with a dedicated user-data-dir
+/// (PROP-15.5: resolved from active PersonaPack when a resolver is wired).
 /// Never attaches to Kayleigh's daily Chrome profile.
 /// </summary>
 public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
@@ -18,36 +20,34 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
     private readonly IOptions<ToolsOptions> _opts;
     private readonly ILogger<PlaywrightBrowserBridge>? _log;
     private readonly IVictoriaBrowserViewHub? _view;
+    private readonly IPersonaToolPathsResolver? _toolPaths;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     private IPlaywright? _playwright;
     private IBrowserContext? _context;
     private IPage? _page;
+    private string? _launchedUserDataDir;
     private bool _disposed;
 
     public PlaywrightBrowserBridge(
         IOptions<ToolsOptions> opts,
         ILogger<PlaywrightBrowserBridge>? log = null,
-        IVictoriaBrowserViewHub? view = null)
+        IVictoriaBrowserViewHub? view = null,
+        IPersonaToolPathsResolver? toolPaths = null)
     {
         _opts = opts ?? throw new ArgumentNullException(nameof(opts));
         _log = log;
         _view = view;
+        _toolPaths = toolPaths;
     }
 
     public string BackendName => BackendId;
 
-    public static string ResolveUserDataDir(ToolsOptions opts)
-    {
-        var configured = (opts.PlaywrightUserDataDir ?? "").Trim();
-        if (!string.IsNullOrWhiteSpace(configured))
-            return configured;
+    public static string ResolveUserDataDir(ToolsOptions opts) =>
+        PersonaToolPaths.ResolveLegacyPlaywrightUserDataDir(opts.PlaywrightUserDataDir);
 
-        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (string.IsNullOrWhiteSpace(local))
-            local = Path.GetTempPath();
-        return Path.Combine(local, "SoulCore", "victoria-browser");
-    }
+    private string ResolveActiveUserDataDir() =>
+        _toolPaths?.ResolvePlaywrightUserDataDir() ?? ResolveUserDataDir(_opts.Value);
 
     public async Task<BrowserBridgeResult> HealthAsync(CancellationToken ct = default)
     {
@@ -59,7 +59,7 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
             return new BrowserBridgeResult(
                 true,
                 $"playwright ok: Victoria dedicated Chromium (not Kayleigh's Chrome). url={url} title={title}",
-                new { backend = BackendId, url, title, profile = ResolveUserDataDir(_opts.Value) });
+                new { backend = BackendId, url, title, profile = ResolveActiveUserDataDir() });
         }
         catch (Exception ex)
         {
@@ -801,17 +801,28 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (_page is not null && !_page.IsClosed)
+            var userData = ResolveActiveUserDataDir();
+            if (_page is not null && !_page.IsClosed
+                && string.Equals(_launchedUserDataDir, userData, StringComparison.OrdinalIgnoreCase))
                 return _page;
 
-            var userData = ResolveUserDataDir(_opts.Value);
+            // PROP-15.5: active pack switch may change profile — recycle context.
+            if (_context is not null)
+            {
+                try { await _context.CloseAsync().ConfigureAwait(false); }
+                catch (Exception ex) { _log?.LogDebug(ex, "Playwright context close on profile switch"); }
+                _context = null;
+                _page = null;
+                _launchedUserDataDir = null;
+            }
+
             Directory.CreateDirectory(userData);
             // Refuse obvious Kayleigh Chrome profile paths.
             if (userData.Contains("Google" + Path.DirectorySeparatorChar + "Chrome", StringComparison.OrdinalIgnoreCase)
                 || userData.Contains("Microsoft" + Path.DirectorySeparatorChar + "Edge", StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
-                    "PlaywrightUserDataDir must not be Kayleigh's Chrome/Edge profile. Use SoulCore/victoria-browser.");
+                    "PlaywrightUserDataDir must not be Kayleigh's Chrome/Edge profile. Use a SoulCore persona browser dir.");
             }
 
             _playwright ??= await Playwright.CreateAsync().ConfigureAwait(false);
@@ -839,6 +850,7 @@ public sealed class PlaywrightBrowserBridge : IBrowserBridge, IAsyncDisposable
             await _context.AddInitScriptAsync(PlaywrightClickCursor.InitScript).ConfigureAwait(false);
 
             _page = _context.Pages.Count > 0 ? _context.Pages[0] : await _context.NewPageAsync().ConfigureAwait(false);
+            _launchedUserDataDir = userData;
             await EnsureClickCursorAsync(_page).ConfigureAwait(false);
             return _page;
         }

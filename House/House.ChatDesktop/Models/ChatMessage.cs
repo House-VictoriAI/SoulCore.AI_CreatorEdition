@@ -74,13 +74,18 @@ public sealed class ChatMessage : INotifyPropertyChanged
 
     public bool HasText => !string.IsNullOrWhiteSpace(Text);
 
+    /// <summary>Active persona display name for assistant bubbles (PROP-15.4).</summary>
+    public static string AssistantDisplayName { get; set; } = "Companion";
+
     public string DisplayRole => Role switch
     {
         "user" => "You",
-        "assistant" => "Victoria",
+        "assistant" => string.IsNullOrWhiteSpace(AssistantDisplayName) ? "Companion" : AssistantDisplayName,
         "system" => "System",
         _ => Role
     };
+
+    public void NotifyDisplayRoleChanged() => OnPropertyChanged(nameof(DisplayRole));
 
     public string DisplayTime => At.ToLocalTime().ToString("h:mm tt");
 
@@ -91,7 +96,7 @@ public sealed class ChatMessage : INotifyPropertyChanged
 
     public bool IsAssistant => Role == "assistant";
 
-    /// <summary>Contact bubble left of message (Victoria).</summary>
+    /// <summary>Contact bubble left of message (active persona).</summary>
     public bool ShowLeftAvatar => IsAssistant;
 
     /// <summary>Contact bubble right of message (operator).</summary>

@@ -3,6 +3,8 @@ using Microsoft.Extensions.Options;
 using SoulCore.Config;
 using SoulCore.Core;
 using SoulCore.Core.Abstractions;
+using SoulCore.Core.Persona;
+using SoulCore.Host.Persona;
 using SoulCore.Host.Ws;
 using SoulCore.Inference.Clients;
 using SoulCore.Inference.Tooling;
@@ -11,27 +13,46 @@ using SoulCore.Memory;
 
 namespace SoulCore.Protocol.Tests;
 
-/// <summary>PROP-8.1: ChatContextBuilder — single prompt owner + parallel reads.</summary>
+/// <summary>PROP-8.1 / PROP-15.1: ChatContextBuilder — single prompt owner + persona injection.</summary>
 public class ChatContextBuilderTests
 {
     [Fact]
     public void BuildContextPreamble_OrderIsIdentityMemoryEmotion()
     {
+        var blank = PersonaPack.CreateBlank();
         var preamble = ChatContextBuilder.BuildContextPreamble(
-            new[] { "I am Victoria." },
+            new[] { "I am a blank companion." },
             new[] { "We talked about tea yesterday." },
-            "[SoulCore emotion]\nvalence=0.5\n");
+            "[SoulCore emotion]\nvalence=0.5\n",
+            blank);
 
         Assert.StartsWith("[Identity]", preamble, StringComparison.Ordinal);
-        Assert.Contains("Kayleigh", preamble, StringComparison.Ordinal);
+        Assert.Contains("personaId=blank", preamble, StringComparison.Ordinal);
+        Assert.Contains("Friend", preamble, StringComparison.Ordinal);
+        Assert.Contains(PersonaTraitCompiler.Marker, preamble, StringComparison.Ordinal);
         Assert.Contains("[Memory]", preamble, StringComparison.Ordinal);
         Assert.Contains("[SoulCore emotion]", preamble, StringComparison.Ordinal);
+        Assert.DoesNotContain("Victoria", preamble, StringComparison.Ordinal);
         Assert.True(
             preamble.IndexOf("[Identity]", StringComparison.Ordinal)
             < preamble.IndexOf("[Memory]", StringComparison.Ordinal));
         Assert.True(
             preamble.IndexOf("[Memory]", StringComparison.Ordinal)
             < preamble.IndexOf("[SoulCore emotion]", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuildContextPreamble_ActivePackSwitch_ChangesIdentityText()
+    {
+        var blank = ChatContextBuilder.BuildContextPreamble(
+            Array.Empty<string>(), Array.Empty<string>(), "[SoulCore emotion]\n", PersonaPack.CreateBlank());
+        var analyst = ChatContextBuilder.BuildContextPreamble(
+            Array.Empty<string>(), Array.Empty<string>(), "[SoulCore emotion]\n", PersonaPack.CreateAnalystStarter());
+
+        Assert.Contains("personaId=blank", blank, StringComparison.Ordinal);
+        Assert.Contains("personaId=analyst", analyst, StringComparison.Ordinal);
+        Assert.Contains("Analyst", analyst, StringComparison.Ordinal);
+        Assert.NotEqual(blank, analyst);
     }
 
     [Fact]
@@ -52,6 +73,7 @@ public class ChatContextBuilderTests
         var memory = new StubMemoryStore();
         var charter = new StubCharter();
         var emotion = new StubEmotionState();
+        var session = new FixedBlankPersonaSession();
         var builder = new ChatContextBuilder(
             memory,
             new NullEmbeddingClient(),
@@ -62,6 +84,7 @@ public class ChatContextBuilderTests
                 BrowserBackend = "native",
                 DesktopTargetWindowTitle = "victoria-sandbox"
             })),
+            session,
             new LoggerFactory().CreateLogger<ChatContextBuilder>());
 
         var ctx = await builder.BuildAsync(
@@ -70,12 +93,32 @@ public class ChatContextBuilderTests
             desktopTargetWindowTitle: "victoria-sandbox",
             CancellationToken.None);
 
+        Assert.Equal(PersonaPack.BlankPersonaId, ctx.PersonaId);
         Assert.Contains("[Tools]", ctx.Preamble, StringComparison.Ordinal);
         Assert.Contains("workflow_create", ctx.Preamble, StringComparison.Ordinal);
         Assert.Contains(ComputerUseGuidance.VmBlock, ctx.Preamble, StringComparison.Ordinal);
         Assert.Contains("VM PRIMARY", ctx.Preamble, StringComparison.Ordinal);
+        Assert.Contains(PersonaPromptBlocks.ToolMarker, ctx.Preamble, StringComparison.Ordinal);
+        Assert.Contains("personaId=blank", ctx.Preamble, StringComparison.Ordinal);
         Assert.DoesNotContain("WEB IS NOT THE VM", ctx.Preamble, StringComparison.Ordinal);
         Assert.NotEmpty(ctx.EmotionPreamble);
+    }
+
+    [Fact]
+    public async Task BuildAsync_SessionPackChange_SwitchesNextTurnIdentity()
+    {
+        var session = new FixedBlankPersonaSession();
+        var builder = CreateBuilder(session);
+
+        var first = await builder.BuildAsync("hello", useToolLoop: false, null, CancellationToken.None);
+        Assert.Equal("blank", first.PersonaId);
+        Assert.Contains("Blank", first.Preamble, StringComparison.Ordinal);
+
+        session.ReplaceActive(PersonaPack.CreateMentorStarter());
+        var second = await builder.BuildAsync("hello again", useToolLoop: false, null, CancellationToken.None);
+        Assert.Equal("mentor", second.PersonaId);
+        Assert.Contains("Mentor", second.Preamble, StringComparison.Ordinal);
+        Assert.Contains(PersonaTraitCompiler.Marker, second.Preamble, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -87,13 +130,25 @@ public class ChatContextBuilderTests
             new ThrowingCharter(),
             new StubEmotionState(),
             new ComputerControlGate(Options.Create(new ToolsOptions { BrowserBackend = "native" })),
+            new FixedBlankPersonaSession(),
             new LoggerFactory().CreateLogger<ChatContextBuilder>());
 
         var ctx = await builder.BuildAsync("hello", useToolLoop: false, null, CancellationToken.None);
 
         Assert.Empty(ctx.IdentityAnchors);
         Assert.NotEmpty(ctx.EmotionPreamble);
+        Assert.Equal(PersonaPack.BlankPersonaId, ctx.PersonaId);
     }
+
+    private static ChatContextBuilder CreateBuilder(IPersonaSession session) =>
+        new(
+            new StubMemoryStore(),
+            new NullEmbeddingClient(),
+            new StubCharter(),
+            new StubEmotionState(),
+            new ComputerControlGate(Options.Create(new ToolsOptions { BrowserBackend = "native" })),
+            session,
+            new LoggerFactory().CreateLogger<ChatContextBuilder>());
 
     private sealed class ThrowingCharter : ICharter
     {

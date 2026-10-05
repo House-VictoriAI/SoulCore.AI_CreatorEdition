@@ -28,7 +28,7 @@ public sealed partial class VirtualBoxGuestAppLauncher : IVmGuestDesktop, IVmGue
         @"^0x[0-9a-fA-F]+\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(\d+)\s+(\d+)\s+\S+\s+(.*)$",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
-    private readonly string _vmName;
+    private readonly Func<string> _vmName;
     private readonly string _vboxManage;
     private readonly Func<string, IReadOnlyList<string>, CancellationToken, Task<(int Exit, string Stdout, string Stderr)>> _run;
     private readonly Func<string?> _password;
@@ -37,6 +37,12 @@ public sealed partial class VirtualBoxGuestAppLauncher : IVmGuestDesktop, IVmGue
     private string? _cachedUid;
 
     public VirtualBoxGuestAppLauncher(string vmName, string? vboxManage = null)
+        : this(() => vmName, vboxManage, RunVBoxManageAsync, ResolveGuestPassword, ResolveGuestUser)
+    {
+    }
+
+    /// <summary>PROP-15.5: VM name / window title substring resolved per call from active pack.</summary>
+    public VirtualBoxGuestAppLauncher(Func<string> vmName, string? vboxManage = null)
         : this(vmName, vboxManage, RunVBoxManageAsync, ResolveGuestPassword, ResolveGuestUser)
     {
     }
@@ -47,12 +53,32 @@ public sealed partial class VirtualBoxGuestAppLauncher : IVmGuestDesktop, IVmGue
         Func<string, IReadOnlyList<string>, CancellationToken, Task<(int Exit, string Stdout, string Stderr)>> run,
         Func<string?>? password = null,
         Func<string>? username = null)
+        : this(() => vmName, vboxManage, run, password, username)
     {
-        _vmName = string.IsNullOrWhiteSpace(vmName) ? "victoria-sandbox" : vmName.Trim();
+    }
+
+    public VirtualBoxGuestAppLauncher(
+        Func<string> vmName,
+        string? vboxManage,
+        Func<string, IReadOnlyList<string>, CancellationToken, Task<(int Exit, string Stdout, string Stderr)>> run,
+        Func<string?>? password = null,
+        Func<string>? username = null)
+    {
+        _vmName = vmName ?? throw new ArgumentNullException(nameof(vmName));
         _vboxManage = string.IsNullOrWhiteSpace(vboxManage) ? DefaultVBoxManage : vboxManage.Trim();
         _run = run ?? throw new ArgumentNullException(nameof(run));
         _password = password ?? ResolveGuestPassword;
         _username = username ?? ResolveGuestUser;
+    }
+
+    /// <summary>Resolved VirtualBox VM name (pack title, else legacy victoria-sandbox).</summary>
+    private string VmName
+    {
+        get
+        {
+            var n = (_vmName() ?? string.Empty).Trim();
+            return n.Length > 0 ? n : "victoria-sandbox";
+        }
     }
 
     public static string ResolveGuestUser()
@@ -103,7 +129,7 @@ public sealed partial class VirtualBoxGuestAppLauncher : IVmGuestDesktop, IVmGue
         return new DesktopOpResult(
             true,
             note,
-            new { app = resolved.Alias, vm = _vmName, search, exe, url, hostLaunch = false, method = "guestcontrol" });
+            new { app = resolved.Alias, vm = VmName, search, exe, url, hostLaunch = false, method = "guestcontrol" });
     }
 
     public async Task<DesktopOpResult> ProbeWhoamiAsync(CancellationToken ct = default)
@@ -572,7 +598,7 @@ public sealed partial class VirtualBoxGuestAppLauncher : IVmGuestDesktop, IVmGue
         var putenv = await SessionPutenvAsync(auth.User, auth.Password!, ct).ConfigureAwait(false);
         using var passFile = new PasswordFile(auth.Password!);
         var argv = BuildGuestControl(
-            _vmName,
+            VmName,
             "start",
             auth.User,
             passFile.Path,
@@ -603,7 +629,7 @@ public sealed partial class VirtualBoxGuestAppLauncher : IVmGuestDesktop, IVmGue
         var putenv = await SessionPutenvAsync(auth.User, auth.Password!, ct).ConfigureAwait(false);
         using var passFile = new PasswordFile(auth.Password!);
         var argv = BuildGuestControl(
-            _vmName,
+            VmName,
             "run",
             auth.User,
             passFile.Path,
@@ -635,7 +661,7 @@ public sealed partial class VirtualBoxGuestAppLauncher : IVmGuestDesktop, IVmGue
         using var passFile = new PasswordFile(auth.Password!);
         var argv = new List<string>
         {
-            "guestcontrol", _vmName, "copyfrom",
+            "guestcontrol", VmName, "copyfrom",
             "--username", auth.User,
             "--passwordfile", passFile.Path,
             "--quiet",
@@ -672,7 +698,7 @@ public sealed partial class VirtualBoxGuestAppLauncher : IVmGuestDesktop, IVmGue
     private async Task<DesktopOpResult> HostScreenshotPngAsync(CancellationToken ct)
     {
         var path = Path.Combine(Path.GetTempPath(), "hv-vbox-screenshotpng.png");
-        var argv = new[] { "controlvm", _vmName, "screenshotpng", path };
+        var argv = new[] { "controlvm", VmName, "screenshotpng", path };
         var (exit, stdout, stderr) = await _run(_vboxManage, argv, ct).ConfigureAwait(false);
         if (exit != 0 || !File.Exists(path))
         {
@@ -796,7 +822,7 @@ public sealed partial class VirtualBoxGuestAppLauncher : IVmGuestDesktop, IVmGue
     {
         using var passFile = new PasswordFile(password);
         var argv = BuildGuestControl(
-            _vmName,
+            VmName,
             "run",
             user,
             passFile.Path,

@@ -146,6 +146,7 @@ public partial class MainWindow : Window
             await EnsureLocalStackOnOpenAsync().ConfigureAwait(true);
             await _ws.ConnectAsync();
             await ProbeHealthAsync();
+            await RefreshPersonasAsync().ConfigureAwait(true);
             _pollTimer.Start();
             _desktopViewTimer.Start();
             _browserViewTimer.Start();
@@ -169,6 +170,7 @@ public partial class MainWindow : Window
             _emailSettings.Dispose();
             _desktopView.Dispose();
             _browserView.Dispose();
+            _personas.Dispose();
             _media.Dispose();
             _stack.Dispose();
             _chatHistory.Dispose();
@@ -236,7 +238,7 @@ public partial class MainWindow : Window
             NavSettings.Classes.Remove("active");
         if (NavPresence is not null)
             NavPresence.IsChecked = true;
-        Title = "House Victoria — Presence";
+        Title = "SoulCore CreatorEdition — Presence";
         _ = RefreshDesktopViewAsync();
         _ = RefreshVictoriaBrowserViewAsync();
     }
@@ -250,10 +252,11 @@ public partial class MainWindow : Window
             NavSettings.Classes.Add("active");
         if (NavPresence is not null)
             NavPresence.IsChecked = false;
-        Title = "House Victoria — Settings";
+        Title = "SoulCore CreatorEdition — Settings";
         ApplySystemStatus(_lastHealth);
         SeedNotificationControls();
         UpdateIdentityDetail();
+        _ = RefreshPersonasAsync();
         _ = RefreshToolsAccessAsync();
         _ = RefreshEmailAccountsAsync();
     }
@@ -286,7 +289,7 @@ public partial class MainWindow : Window
         var name = (DisplayNameBox.Text ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(name))
         {
-            name = "Victoria";
+            name = string.IsNullOrWhiteSpace(_activePersonaDisplayName) ? "Companion" : _activePersonaDisplayName;
             DisplayNameBox.Text = name;
         }
 
@@ -302,18 +305,24 @@ public partial class MainWindow : Window
     {
         if (IdentityDetailBox is null) return;
 
-        var name = string.IsNullOrWhiteSpace(_uiSettings.DisplayName) ? "Victoria" : _uiSettings.DisplayName.Trim();
+        var name = string.IsNullOrWhiteSpace(_uiSettings.DisplayName)
+            ? (string.IsNullOrWhiteSpace(_activePersonaDisplayName) ? "Companion" : _activePersonaDisplayName)
+            : _uiSettings.DisplayName.Trim();
         var snap = _lastHealth;
         var charter = FormatCharterLine(snap);
+        var personaLine = string.IsNullOrWhiteSpace(_activePersonaId)
+            ? "(not loaded)"
+            : $"{_activePersonaDisplayName} ({_activePersonaId})";
 
         IdentityDetailBox.Text =
             $"{name}\n\n" +
-            "Persistent AI companion for House Victoria (SoulCore).\n" +
-            "She chats over the Presence WebSocket, keeps episodic memory in Host SQLite, " +
+            "SoulCore CreatorEdition Presence — persistent AI companion shell.\n" +
+            "Chats over the Presence WebSocket, keeps episodic memory in Host SQLite, " +
             "and optionally drives desktop tools and an Unreal avatar.\n\n" +
-            "Identity anchors (persona / safety envelope) live in SoulCore charter storage. " +
-            "This shell shows Host-reported charter lock state and the local display name — " +
-            "it does not rewrite Host persona YAML.\n\n" +
+            "Active persona packs live on the Host (/api/personas). " +
+            "Create/edit in Settings → Identity; switching quarantines memories — they do not follow. " +
+            "Trait and charter saves apply on the next chat turn.\n\n" +
+            $"Active persona: {personaLine}\n" +
             $"Endpoint: {ConnectionDefaults.DisplayEndpoint}\n" +
             $"Alive: {(snap.Alive ? "yes" : "no")} · Warm: {(snap.Warm ? "yes" : "no")}\n" +
             $"SoulLoop: {FormatSoulLoop(snap)}\n" +

@@ -23,7 +23,7 @@ public sealed class LocalUiSettings
     public const double MinSightRowHeight = 120;
     public const double MinBrowserRowHeight = 120;
 
-    public string DisplayName { get; set; } = "Victoria";
+    public string DisplayName { get; set; } = "Companion";
 
     public NotificationSettings Notifications { get; set; } = new();
 
@@ -105,7 +105,7 @@ public sealed class LocalUiSettings
     public void Normalize()
     {
         if (string.IsNullOrWhiteSpace(DisplayName))
-            DisplayName = "Victoria";
+            DisplayName = "Companion";
 
         if (WindowWidth is double w)
             WindowWidth = Clamp(w, MinWindowWidth, 4000);

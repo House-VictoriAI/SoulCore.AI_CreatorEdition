@@ -27,7 +27,7 @@ public sealed class ScopedDesktopControlBackend : IDesktopControlBackend
     };
 
     private readonly IDesktopControlBackend _inner;
-    private readonly string _titleContains;
+    private readonly Func<string> _titleContains;
     private readonly IVmGuestAppLauncher? _guestApps;
     private readonly IVmGuestDesktop? _guestDesktop;
     private readonly IDesktopControlBackend? _win32Windows;
@@ -37,15 +37,30 @@ public sealed class ScopedDesktopControlBackend : IDesktopControlBackend
         string titleContains,
         IVmGuestAppLauncher? guestApps = null,
         IDesktopControlBackend? win32Windows = null)
+        : this(inner, () => titleContains ?? string.Empty, guestApps, win32Windows)
+    {
+    }
+
+    /// <summary>
+    /// PROP-15.5: title resolved per call from the active PersonaPack (via resolver).
+    /// Empty string = pass-through (unrestricted).
+    /// </summary>
+    public ScopedDesktopControlBackend(
+        IDesktopControlBackend inner,
+        Func<string> titleContains,
+        IVmGuestAppLauncher? guestApps = null,
+        IDesktopControlBackend? win32Windows = null)
     {
         _inner = inner ?? throw new ArgumentNullException(nameof(inner));
-        _titleContains = (titleContains ?? string.Empty).Trim();
+        _titleContains = titleContains ?? throw new ArgumentNullException(nameof(titleContains));
         _guestApps = guestApps;
         _guestDesktop = guestApps as IVmGuestDesktop;
         _win32Windows = win32Windows;
     }
 
-    public bool IsActive => _titleContains.Length > 0;
+    private string TitleContains => (_titleContains() ?? string.Empty).Trim();
+
+    public bool IsActive => TitleContains.Length > 0;
 
     public async Task<DesktopOpResult> ScreenshotAsync(int monitor, CancellationToken ct = default)
     {
@@ -178,7 +193,7 @@ public sealed class ScopedDesktopControlBackend : IDesktopControlBackend
             {
                 return new DesktopOpResult(
                     false,
-                    $"desktop scope '{_titleContains}': key '{normalized}' refused even in guest.",
+                    $"desktop scope '{TitleContains}': key '{normalized}' refused even in guest.",
                     null);
             }
 
@@ -208,7 +223,7 @@ public sealed class ScopedDesktopControlBackend : IDesktopControlBackend
         {
             return new DesktopOpResult(
                 false,
-                $"desktop scope '{_titleContains}': key '{normalized}' leaves the VM window — refused. " +
+                $"desktop scope '{TitleContains}': key '{normalized}' leaves the VM window — refused. " +
                 "Use keys inside the guest only.",
                 null);
         }
@@ -258,7 +273,7 @@ public sealed class ScopedDesktopControlBackend : IDesktopControlBackend
         {
             return new DesktopOpResult(
                 false,
-                $"desktop scope '{_titleContains}': desktop_open_app on the Windows host is BLOCKED. " +
+                $"desktop scope '{TitleContains}': desktop_open_app on the Windows host is BLOCKED. " +
                 "Drive apps inside the VM via Guest Additions (set SOULCORE_VBOX_GUEST_PASS). " +
                 "Do not launch Chrome/Notepad/etc. on Kayleigh's real desktop.",
                 null);
@@ -289,7 +304,7 @@ public sealed class ScopedDesktopControlBackend : IDesktopControlBackend
         {
             return new DesktopOpResult(
                 true,
-                $"desktop scope '{_titleContains}': no matching window (is the VM running / visible?). " +
+                $"desktop scope '{TitleContains}': no matching window (is the VM running / visible?). " +
                 "Expected a title containing that substring (e.g. 'victoria-sandbox [Running] - Oracle VirtualBox').",
                 Array.Empty<object>());
         }
@@ -335,12 +350,12 @@ public sealed class ScopedDesktopControlBackend : IDesktopControlBackend
 
         var ask = (title ?? string.Empty).Trim();
         if (ask.Length > 0
-            && !ask.Contains(_titleContains, StringComparison.OrdinalIgnoreCase)
-            && !_titleContains.Contains(ask, StringComparison.OrdinalIgnoreCase))
+            && !ask.Contains(TitleContains, StringComparison.OrdinalIgnoreCase)
+            && !TitleContains.Contains(ask, StringComparison.OrdinalIgnoreCase))
         {
             return new DesktopOpResult(
                 false,
-                $"desktop scope '{_titleContains}': focus refused for '{ask}' — only the scoped VM window is allowed.",
+                $"desktop scope '{TitleContains}': focus refused for '{ask}' — only the scoped VM window is allowed.",
                 null);
         }
 
@@ -451,7 +466,7 @@ public sealed class ScopedDesktopControlBackend : IDesktopControlBackend
         if (!listed.Success)
             return Array.Empty<WindowHit>();
         return ParseWindows(listed.Content)
-            .Where(w => w.Title.Contains(_titleContains, StringComparison.OrdinalIgnoreCase));
+            .Where(w => w.Title.Contains(TitleContains, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task EnsureFocusedAsync(WindowHit win, CancellationToken ct)
@@ -479,7 +494,7 @@ public sealed class ScopedDesktopControlBackend : IDesktopControlBackend
 
     private DesktopOpResult MissingTarget() => new(
         false,
-        $"desktop scope '{_titleContains}': target window not found. " +
+        $"desktop scope '{TitleContains}': target window not found. " +
         "Start the VM (window can stay minimized if Guest Additions + SOULCORE_VBOX_GUEST_PASS are set).",
         null);
 

@@ -28,12 +28,20 @@ internal static class BackfillEmbeddings
             .AddEnvironmentVariables(prefix: "SOULCORE_")
             .Build();
 
-        var memoryOpts = config.GetSection(MemoryOptions.SectionName).Get<MemoryOptions>() ?? new MemoryOptions();
+        var personaOpts = config.GetSection(PersonaOptions.SectionName).Get<PersonaOptions>() ?? new PersonaOptions();
         var inferenceOpts = config.GetSection(InferenceOptions.SectionName).Get<InferenceOptions>() ?? new InferenceOptions();
 
-        var dbPath = string.IsNullOrWhiteSpace(dbPathOverride)
-            ? memoryOpts.ResolveDbPath()
-            : Path.GetFullPath(dbPathOverride);
+        // PROP-15.2: default to active persona's quarantined DB when no --db override.
+        string dbPath;
+        if (!string.IsNullOrWhiteSpace(dbPathOverride))
+        {
+            dbPath = Path.GetFullPath(dbPathOverride);
+        }
+        else
+        {
+            var activeId = ResolveActivePersonaId(personaOpts);
+            dbPath = PersonaMemoryPaths.ResolveMemoryDbPath(personaOpts.ResolveRootDirectory(), activeId);
+        }
 
         var model = string.IsNullOrWhiteSpace(inferenceOpts.EmbeddingModel)
             ? "nomic-embed-text"
@@ -124,6 +132,22 @@ internal static class BackfillEmbeddings
         }
 
         return null;
+    }
+
+    private static string ResolveActivePersonaId(PersonaOptions personaOpts)
+    {
+        var root = personaOpts.ResolveRootDirectory();
+        var marker = Path.Combine(root, "active.txt");
+        if (File.Exists(marker))
+        {
+            var id = File.ReadAllText(marker).Trim();
+            if (!string.IsNullOrWhiteSpace(id))
+                return id;
+        }
+
+        return string.IsNullOrWhiteSpace(personaOpts.DefaultActivePersonaId)
+            ? "blank"
+            : personaOpts.DefaultActivePersonaId.Trim();
     }
 
     private static string FindHostContentRoot()

@@ -4,20 +4,20 @@ prop_id: PROP-15-persona-creation-platform
 from: TT-01
 to: PM-01
 mode: idea
-status: Sent — awaiting PM ticketing
+status: Ticketed — PROP-15.0–15.6
 created: 2026-10-05
 updated: 2026-10-05
 proposal: docs/agents/unexecuted_proposals/persona-creation-platform.md
 execution_repo: https://github.com/House-VictoriAI/SoulCore.AI_CreatorEdition
 upstream_repo: https://github.com/Linearthrone/SoulCore.AI
-pm_tickets:
+pm_tickets: docs/agents/tasks/PROP-15.0-PM01-routing.md, docs/agents/tasks/PROP-15.1-PM01-to-BED01.md, docs/agents/tasks/PROP-15.2-PM01-to-BED01.md, docs/agents/tasks/PROP-15.3-PM01-to-FED01.md, docs/agents/tasks/PROP-15.4-PM01-to-FED01.md, docs/agents/tasks/PROP-15.5-PM01-to-BED01.md, docs/agents/tasks/PROP-15.6-PM01-to-QA01.md
 ---
 
 # PROP-15 — CreatorEdition persona platform (quarantined brains + in-app creation)
 
 ## Proposal
 
-`docs/agents/unexecuted_proposals/persona-creation-platform.md` (tracked on LinearThrone; **execute on CreatorEdition**)
+`docs/agents/unexecuted_proposals/persona-creation-platform.md`
 
 Mode: **idea**
 
@@ -32,7 +32,7 @@ LinearThrone `SoulCore.AI` remains the House Victoria product line. Do not imple
 
 Strip Victoria-as-default on CreatorEdition. Ship an **in-app persona creation / adjustment UI** (templates + trait scales + charter) with **total memory quarantine** per persona, **one active persona at a time** (APIs framed for future multi-simultaneous), and MVP runtime covering **chat + memory + charter + SoulLoop + VM + tooling**. Shared knowledge later = **MCP shared-memory server**, not a shared house table. Metahuman/VE body stays part two.
 
-## Decisions already accepted (Kurt 2026-10-05)
+## Decisions already accepted (LinearThrone 2026-10-05)
 
 | Lock | Decision |
 | --- | --- |
@@ -46,23 +46,8 @@ Strip Victoria-as-default on CreatorEdition. Ship an **in-app persona creation /
 
 No product clarifying questions remain for PM.
 
-## Suggested splits
+## PM accept
 
-PM may re-split / reassign. These are hints — **all on CreatorEdition**:
-
-- `PROP-15.0` — PM01: CreatorEdition freeze + upstream cherry-pick notes; Victoria-defaults strip checklist.
-- `PROP-15.1` — BED01: PersonaPack + prompt/tool injection; `personaId` on session; single-active loader framed for multi.
-- `PROP-15.2` — BED01: Per-persona quarantined stores (DB/vector paths); dual-persona switch proves zero cross-read.
-- `PROP-15.3` — FED01 + BED01: In-app create/edit wizard — templates, trait-band scales, charter editor.
-- `PROP-15.4` — FED01: Active-persona switcher + CreatorEdition shell de-brand.
-- `PROP-15.5` — BED01 + OPS01: VM + tooling paths per pack (profile dir, sandbox title); desk smoke.
-- `PROP-15.6` — QA01: Create persona ≠ Victoria; quarantine test; trait A/B; VM tool path.
-
-## Kill criteria
-
-- Custom non-Victoria persona cannot run E2E on CreatorEdition Host (chat + memory + charter + SoulLoop + VM/tool).
-- Quarantine leak across personas after switch.
-- Trait scales produce no detectable behavior difference.
-- Work merged only to LinearThrone and never to CreatorEdition.
-
-Activate PM-01 to ticket on **CreatorEdition**. TT-01 does not write the execution tickets.
+- Avenue **B+** accepted.
+- Splits ticketed as PROP-15.0–15.6 (see `pm_tickets` frontmatter).
+- First execution handoff: **PROP-15.1 → BED-01**.

@@ -163,7 +163,7 @@ public partial class MainWindow
             return snap.Detail!;
         if (snap.EmbedPane)
             return "Waiting for VirtualBox victoria-sandbox (visible, not minimized) — or a desktop_screenshot JPEG fallback.";
-        return "Waiting for Victoria's browser — pink cursor idle, teal on click";
+        return "Waiting for browser view — pink cursor idle, teal on click";
     }
 
     private void ApplyVictoriaBrowserEmbed(BrowserEmbedSnapshot embed)

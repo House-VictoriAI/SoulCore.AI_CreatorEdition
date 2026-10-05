@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -14,7 +14,7 @@
     <!-- PROP-4.2: bump with House/scripts/bump-versions.ps1 on every Presence fix (vpk packVersion). -->
     <Version>0.1.8</Version>
     <InformationalVersion>0.1.8</InformationalVersion>
-    <Product>House Victoria Presence</Product>
+    <Product>SoulCore CreatorEdition Presence</Product>
     <Company>LinearThrone</Company>
   </PropertyGroup>
 

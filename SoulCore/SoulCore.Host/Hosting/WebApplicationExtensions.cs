@@ -14,7 +14,9 @@ using SoulCore.Inference.Clients;
 using SoulCore.Inference.Tooling;
 using SoulCore.Core.Charter;
 using SoulCore.Core.Safety;
+using SoulCore.Core.Persona;
 using SoulCore.Host.Companion;
+using SoulCore.Host.Persona;
 using SoulCore.Host.Voice;
 using SoulCore.Host.Ws;
 using SoulCore.Inference.Tools.Browser;
@@ -70,6 +72,7 @@ internal static class WebApplicationExtensions
 
         app.MapCompanionApi();
         app.MapVoiceApi();
+        app.MapPersonaApi();
 
         app.MapGet("/health", async (
             IOptions<HostBindOptions> opts,
@@ -81,9 +84,11 @@ internal static class WebApplicationExtensions
             IOptions<ChatWsOptions> chatOpts,
             IOptions<SoulLoopOptions> loopOpts,
             IToolsAccessSettings access,
+            SoulCore.Core.Persona.IPersonaToolPathsResolver toolPaths,
             DriftWatcher driftWatcher,
             SpendMeter spendMeter,
-            CharterService charter,
+            IPersonaStoreHub personaStores,
+            IPersonaSession personaSession,
             SoulCore.Inference.Presence.IPresenceActivityHub presenceActivity,
             CancellationToken cancellationToken) =>
         {
@@ -118,6 +123,7 @@ internal static class WebApplicationExtensions
             int charterTotal = 0, charterLocked = 0;
             try
             {
+                var charter = personaStores.GetCharterService(personaSession.ActivePersonaId);
                 (charterTotal, charterLocked) = await charter.GetLockCountsAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception)
@@ -126,6 +132,7 @@ internal static class WebApplicationExtensions
             }
 
             var charterFullyLocked = charterTotal > 0 && charterLocked == charterTotal;
+            var activePack = personaSession.GetActive();
 
             return Results.Json(new
             {
@@ -135,6 +142,13 @@ internal static class WebApplicationExtensions
                 bind = opts.Value.BindAddress,
                 port = opts.Value.Port,
                 phase = 1,
+                persona = new
+                {
+                    personaId = activePack.PersonaId,
+                    displayName = activePack.DisplayName,
+                    contactId = activePack.ContactId,
+                    humanAddress = activePack.HumanAddress
+                },
                 ws = new
                 {
                     path = chatOpts.Value.Path,
@@ -143,7 +157,9 @@ internal static class WebApplicationExtensions
                 memory = new
                 {
                     open = memoryOk,
-                    path = memory.DatabasePath
+                    path = memory.DatabasePath,
+                    personaId = activePack.PersonaId,
+                    quarantine = "persona-scoped"
                 },
                 inference = new
                 {
@@ -177,7 +193,7 @@ internal static class WebApplicationExtensions
                 },
                 // PROP-4 BED: Presence HUD activity — short doing-now line (never loop.want slogans).
                 presence = PresenceDto(presenceActivity.GetSnapshot()),
-                tools = ToolsSettingsDto(access),
+                tools = ToolsSettingsDto(access, toolPaths),
                 charter = new
                 {
                     anchors = charterTotal,
@@ -213,9 +229,15 @@ internal static class WebApplicationExtensions
             return Results.Json(new { acked });
         });
 
-        app.MapGet("/settings/tools", (IToolsAccessSettings access) => Results.Json(ToolsSettingsDto(access)));
+        app.MapGet("/settings/tools", (
+            IToolsAccessSettings access,
+            SoulCore.Core.Persona.IPersonaToolPathsResolver? toolPaths) =>
+            Results.Json(ToolsSettingsDto(access, toolPaths)));
 
-        app.MapPost("/settings/tools", async (HttpRequest request, IToolsAccessSettings access) =>
+        app.MapPost("/settings/tools", async (
+            HttpRequest request,
+            IToolsAccessSettings access,
+            SoulCore.Core.Persona.IPersonaToolPathsResolver? toolPaths) =>
         {
             using var doc = await JsonDocument.ParseAsync(request.Body).ConfigureAwait(false);
             var root = doc.RootElement;
@@ -255,7 +277,7 @@ internal static class WebApplicationExtensions
             if (ReadBool(root, "allowEmailDelete") is { } emailDelete)
                 access.SetAllowEmailDelete(emailDelete);
 
-            return Results.Json(ToolsSettingsDto(access));
+            return Results.Json(ToolsSettingsDto(access, toolPaths));
         });
 
         // Email account credentials (Presence Settings + companion). Passwords never echoed.
@@ -345,18 +367,21 @@ internal static class WebApplicationExtensions
         }).AddEndpointFilter(CompanionEmailAuthFilter);
 
         // TASK-177: Identity tab payload — Companion display name + charter anchor details
-        // (read-only from CharterService; no fabricated biography).
+        // (read-only from active persona's quarantined CharterService; no fabricated biography).
         app.MapGet("/settings/identity", async (
             IOptions<CompanionOptions> companionOpts,
-            CharterService charter,
+            IPersonaSession personaSession,
+            IPersonaStoreHub personaStores,
             CancellationToken cancellationToken) =>
         {
             var companion = companionOpts.Value ?? new CompanionOptions();
+            var pack = personaSession.GetActive();
             int charterTotal = 0, charterLocked = 0;
             IReadOnlyList<CharterAnchorInfo> identityAnchors = Array.Empty<CharterAnchorInfo>();
             IReadOnlyList<CharterAnchorInfo> allAnchors = Array.Empty<CharterAnchorInfo>();
             try
             {
+                var charter = personaStores.GetCharterService(pack.PersonaId);
                 (charterTotal, charterLocked) = await charter.GetLockCountsAsync(cancellationToken).ConfigureAwait(false);
                 identityAnchors = await charter.ListAnchorDetailsAsync("identity", cancellationToken).ConfigureAwait(false);
                 allAnchors = await charter.ListAnchorDetailsAsync(kind: null, cancellationToken).ConfigureAwait(false);
@@ -380,8 +405,12 @@ internal static class WebApplicationExtensions
 
             return Results.Json(new
             {
-                displayName = companion.DefaultContactName,
-                contactId = companion.DefaultContactId,
+                personaId = pack.PersonaId,
+                displayName = pack.DisplayName,
+                contactId = pack.ContactId,
+                humanAddress = pack.HumanAddress,
+                companionFallbackContactId = companion.DefaultContactId,
+                memoryDbPath = personaStores.ResolveMemoryDbPath(pack.PersonaId),
                 charter = new
                 {
                     anchors = charterTotal,
@@ -391,7 +420,7 @@ internal static class WebApplicationExtensions
                 },
                 identityAnchors = identityAnchors.Select(AnchorDto).ToArray(),
                 anchors = allAnchors.Select(AnchorDto).ToArray(),
-                note = "Read-only charter/identity anchors from SoulCore SQLite. Display name from Companion options (Victoria)."
+                note = "Display name/contact from active PersonaPack. Charter/episodic/journal from persona-quarantined SQLite (PROP-15.2)."
             });
         });
 
@@ -514,6 +543,7 @@ internal static class WebApplicationExtensions
             IBrowserBridge bridge,
             IOptions<ToolsOptions> tools,
             IToolsAccessSettings access,
+            SoulCore.Core.Persona.IPersonaToolPathsResolver? toolPaths,
             CancellationToken ct) =>
         {
             var opts = tools.Value;
@@ -558,10 +588,11 @@ internal static class WebApplicationExtensions
                 });
             }
 
-            // VM embed wins when enabled — Her screen shows victoria-sandbox VirtualBox window.
+            // VM embed wins when enabled — Her screen shows the active pack's VirtualBox window.
             if (vmEmbed)
             {
-                var titleFilter = (opts.DesktopTargetWindowTitle ?? "").Trim();
+                var titleFilter = toolPaths?.ResolveDesktopTargetWindowTitle()
+                    ?? (opts.DesktopTargetWindowTitle ?? "").Trim();
                 if (string.IsNullOrWhiteSpace(titleFilter))
                     titleFilter = "victoria-sandbox";
 
@@ -575,7 +606,7 @@ internal static class WebApplicationExtensions
                         hwnd = 0,
                         pid = 0,
                         title = (string?)null,
-                        detail = $"No VirtualBox window matching '{titleFilter}' yet — start victoria-sandbox (visible, not minimized) or use JPEG fallback."
+                        detail = $"No VirtualBox window matching '{titleFilter}' yet — start the active persona VM (visible, not minimized) or use JPEG fallback."
                     });
                 }
 
@@ -647,9 +678,13 @@ internal static class WebApplicationExtensions
         activityUpdatedAt = snap.UpdatedAt
     };
 
-    private static object ToolsSettingsDto(IToolsAccessSettings access)
+    private static object ToolsSettingsDto(
+        IToolsAccessSettings access,
+        SoulCore.Core.Persona.IPersonaToolPathsResolver? toolPaths = null)
     {
         var cuaPath = CuaDriverCli.TryFindExe();
+        var resolvedTitle = toolPaths?.ResolveDesktopTargetWindowTitle() ?? access.DesktopTargetWindowTitle;
+        var resolvedProfile = toolPaths?.ResolvePlaywrightUserDataDir();
         return new
         {
             allowDesktopCapture = access.AllowDesktopCapture,
@@ -666,10 +701,12 @@ internal static class WebApplicationExtensions
             browserBackend = access.BrowserBackend,
             mt4Backend = access.Mt4Backend,
             desktopTargetWindowTitle = access.DesktopTargetWindowTitle,
+            resolvedDesktopTargetWindowTitle = resolvedTitle,
+            resolvedPlaywrightUserDataDir = resolvedProfile,
             cuaDriverAvailable = cuaPath is not null,
             cuaDriverPath = cuaPath,
             scope = "session",
-            note = "Session gates until Host restart. Seeded from Tools in appsettings.json. Presence Settings → Tools & Access → Embed VirtualBox in Her screen toggles VmEmbedPane (victoria-sandbox HWND)."
+            note = "Session gates until Host restart. Seeded from Tools in appsettings.json. PROP-15.5: resolvedDesktopTargetWindowTitle / resolvedPlaywrightUserDataDir follow active PersonaPack (pack field -> Tools fallback -> persona browser dir)."
         };
     }
 

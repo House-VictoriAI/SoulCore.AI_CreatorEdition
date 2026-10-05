@@ -183,7 +183,7 @@ public sealed partial class VirtualBoxGuestAppLauncher
         using var passFile = new PasswordFile(auth.Password!);
         var argv = new List<string>
         {
-            "guestcontrol", _vmName, "copyto",
+            "guestcontrol", VmName, "copyto",
             "--username", auth.User,
             "--passwordfile", passFile.Path,
             "--quiet",

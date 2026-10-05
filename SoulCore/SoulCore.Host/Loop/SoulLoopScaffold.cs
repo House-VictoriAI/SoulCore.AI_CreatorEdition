@@ -16,6 +16,8 @@ namespace SoulCore.Host.Loop;
 /// Safe want→act scaffold: proposes a want string only. Never triggers browser/MT4/email/file acts.
 /// Unreal verbs are not called from this loop (optional no-op path remains elsewhere if UE down).
 /// Also appends light journal notes on reflection ticks (feeling always; animation/environment by want).
+/// PROP-15.2: emotion / episodic / journal DI bindings are persona-scoped facades — ticks only
+/// touch the <b>active</b> persona's quarantined SQLite stores (never cross-persona).
 /// </summary>
 public sealed class SoulLoopScaffold : ISoulLoop
 {

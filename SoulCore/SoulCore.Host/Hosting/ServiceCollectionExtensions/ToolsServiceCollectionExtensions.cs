@@ -3,6 +3,7 @@ using SoulCore.Adapters.Ws;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SoulCore.Config;
+using SoulCore.Core.Persona;
 using SoulCore.Inference.Clients;
 using SoulCore.Inference.Tooling;
 using SoulCore.Core.Abstractions;
@@ -139,14 +140,19 @@ internal static class ToolsServiceCollectionExtensions
                     sp.GetRequiredService<IToolsAccessSettings>());
             }
 
-            var scopeTitle = sp.GetRequiredService<IToolsAccessSettings>().DesktopTargetWindowTitle;
-            if (string.IsNullOrWhiteSpace(scopeTitle))
-                return inner;
-            var guest = new VirtualBoxGuestAppLauncher(scopeTitle);
+            // PROP-15.5: resolve VM title from active PersonaPack on each desktop op
+            // (always wrap so activate can change scope without rebuilding DI).
+            var toolPaths = sp.GetService<IPersonaToolPathsResolver>();
+            var access = sp.GetRequiredService<IToolsAccessSettings>();
+            Func<string> resolveTitle = toolPaths is not null
+                ? toolPaths.ResolveDesktopTargetWindowTitle
+                : () => access.DesktopTargetWindowTitle;
+
+            var guest = new VirtualBoxGuestAppLauncher(resolveTitle);
             sp.GetRequiredService<GuestVmBrowserBridgeHolder>().Set(guest, guest);
             return new ScopedDesktopControlBackend(
                 inner,
-                scopeTitle,
+                resolveTitle,
                 guest,
                 new NativeDesktopControlBackend());
         });
@@ -223,10 +229,14 @@ internal static class ToolsServiceCollectionExtensions
                 return new PlaywrightBrowserBridge(
                     sp.GetRequiredService<IOptions<ToolsOptions>>(),
                     sp.GetService<ILogger<PlaywrightBrowserBridge>>(),
-                    sp.GetRequiredService<IVictoriaBrowserViewHub>());
+                    sp.GetRequiredService<IVictoriaBrowserViewHub>(),
+                    sp.GetService<IPersonaToolPathsResolver>());
             }
 
-            var scopeTitle = (opts.DesktopTargetWindowTitle ?? "").Trim();
+            // PROP-15.5: prefer active-pack title when choosing GuestVm browser bridge.
+            var toolPaths = sp.GetService<IPersonaToolPathsResolver>();
+            var scopeTitle = toolPaths?.ResolveDesktopTargetWindowTitle()
+                ?? (opts.DesktopTargetWindowTitle ?? "").Trim();
             if (!string.IsNullOrWhiteSpace(scopeTitle))
             {
                 var holder = sp.GetRequiredService<GuestVmBrowserBridgeHolder>();

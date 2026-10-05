@@ -24,7 +24,7 @@ public partial class App : Application
             {
                 PresenceStartupLog.WriteException("MainWindow ctor", ex);
                 PresenceStartupLog.ShowFatal(
-                    "House Victoria Presence failed to open",
+                    "SoulCore CreatorEdition Presence failed to open",
                     ex.Message);
                 throw;
             }
