@@ -1,5 +1,6 @@
 using SoulCore.Config;
-using SoulCore.Inference.Clients;
+using SoulCore.Core.Persona;
+using SoulCore.Host.Persona;
 using SoulCore.Inference.Tooling;
 
 namespace SoulCore.Protocol.Tests;
@@ -14,6 +15,57 @@ public class InferenceModelRoutingTests
     }
 
     [Fact]
+    public void ResolveChatModel_PackSet_UsesPackOverHost()
+    {
+        var opts = new InferenceOptions { Model = "host-model:latest" };
+        Assert.Equal(
+            "persona-model:7b",
+            InferenceModelRouting.ResolveChatModel(opts, "persona-model:7b"));
+    }
+
+    [Fact]
+    public void ResolveChatModel_PackBlank_FallsBackToHost()
+    {
+        var opts = new InferenceOptions { Model = "host-model:latest" };
+        Assert.Equal("host-model:latest", InferenceModelRouting.ResolveChatModel(opts, ""));
+        Assert.Equal("host-model:latest", InferenceModelRouting.ResolveChatModel(opts, "   "));
+        Assert.Equal("host-model:latest", InferenceModelRouting.ResolveChatModel(opts, packInferenceModel: null));
+    }
+
+    [Fact]
+    public void ResolveChatModel_ActivateB_UsesBModel()
+    {
+        var opts = new InferenceOptions { Model = "host-model:latest" };
+        var session = new FixedBlankPersonaSession();
+
+        var packA = PersonaPack.CreateBlank();
+        packA.PersonaId = "alpha";
+        packA.InferenceModel = "alpha-model:latest";
+        session.ReplaceActive(packA);
+        Assert.Equal("alpha-model:latest", InferenceModelRouting.ResolveChatModel(opts, session));
+
+        var packB = PersonaPack.CreateBlank();
+        packB.PersonaId = "beta";
+        packB.InferenceModel = "beta-model:latest";
+        session.ReplaceActive(packB);
+        Assert.Equal("beta-model:latest", InferenceModelRouting.ResolveChatModel(opts, session));
+        Assert.Equal("beta-model:latest", InferenceModelRouting.ResolveChatModel(opts, session, "beta"));
+    }
+
+    [Fact]
+    public void ResolveToolModel_WhenToolModelUnset_UsesPackChatModel()
+    {
+        var opts = new InferenceOptions
+        {
+            Model = "host-model:latest",
+            ToolModel = ""
+        };
+        Assert.Equal(
+            "persona-tool-default:latest",
+            InferenceModelRouting.ResolveToolModel(opts, ueLive: false, "persona-tool-default:latest"));
+    }
+
+    [Fact]
     public void ResolveToolModel_UeIdle_PrefersToolModel()
     {
         var opts = new InferenceOptions
@@ -23,6 +75,10 @@ public class InferenceModelRoutingTests
             ToolModelUeLive = "tiny-tool"
         };
         Assert.Equal("qwen2.5:14b", InferenceModelRouting.ResolveToolModel(opts, ueLive: false));
+        // Explicit Host ToolModel still wins over pack InferenceModel.
+        Assert.Equal(
+            "qwen2.5:14b",
+            InferenceModelRouting.ResolveToolModel(opts, ueLive: false, "persona-model:7b"));
     }
 
     [Fact]

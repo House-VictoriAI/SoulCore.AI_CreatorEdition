@@ -48,4 +48,38 @@ public class PersonaTraitCompilerTests
         Assert.Contains("Prefer the present exchange", lowText, StringComparison.Ordinal);
         Assert.Contains("Bias toward continuity", highText, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Compile_HardLimitsFromBlurb_OmitsFlexibleBoundaries()
+    {
+        var pack = PersonaPack.CreateBlank();
+        pack.Traits.BoundaryStrictness = 0.1; // Low → Flexible boundaries
+
+        var soft = PersonaTraitCompiler.Compile(pack, hardLimitsFromBlurb: false);
+        var gated = PersonaTraitCompiler.Compile(pack, hardLimitsFromBlurb: true);
+
+        Assert.Contains("Flexible boundaries", soft, StringComparison.Ordinal);
+        Assert.DoesNotContain("Flexible boundaries", gated, StringComparison.Ordinal);
+        Assert.DoesNotContain("Boundaries:", gated, StringComparison.Ordinal);
+        Assert.Contains("Voice:", gated, StringComparison.Ordinal);
+        Assert.Contains("Recall:", gated, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Compile_HardLimitsFromBlurb_KeepsMidAndHighBoundaries()
+    {
+        var mid = PersonaPack.CreateBlank();
+        mid.Traits.BoundaryStrictness = 0.5;
+        var high = PersonaPack.CreateBlank();
+        high.Traits.BoundaryStrictness = 0.95;
+
+        Assert.Contains(
+            "Respect stated limits",
+            PersonaTraitCompiler.Compile(mid, hardLimitsFromBlurb: true),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Strict boundaries",
+            PersonaTraitCompiler.Compile(high, hardLimitsFromBlurb: true),
+            StringComparison.Ordinal);
+    }
 }

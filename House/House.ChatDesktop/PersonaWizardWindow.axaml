@@ -27,8 +27,14 @@
                  TextWrapping="Wrap" Margin="0,0,0,12"
                  Text="Step 1 — pick a template. Blank needs no Victoria pack."/>
 
-      <!-- Step 0: template gallery (create only) -->
+      <!-- Step 0: template gallery (create only) — Host GET /api/personas only -->
       <StackPanel x:Name="TemplateStep" Spacing="8">
+        <TextBlock x:Name="HostRequiredText" FontSize="12" TextWrapping="Wrap"
+                   Foreground="{DynamicResource MutedBrush}" IsVisible="False"
+                   Text="Host persona packs required. Start SoulCore.Host on loopback :7700, then retry."/>
+        <Button x:Name="RetryTemplatesButton" Classes="ghost" Content="Retry Host packs"
+                HorizontalAlignment="Left" MinWidth="140" IsVisible="False"
+                Click="RetryTemplates_Click"/>
         <ListBox x:Name="TemplateList" MaxHeight="360" SelectionChanged="TemplateList_SelectionChanged">
           <ListBox.ItemTemplate>
             <DataTemplate>
@@ -54,6 +60,15 @@
                    Foreground="{DynamicResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
         <TextBox x:Name="HumanAddressBox" Classes="input" MaxLength="64" Height="36"
                  VerticalContentAlignment="Center" Padding="8,0"/>
+        <!-- PROP-15.12: model picker for this pack only (not Presence chrome). -->
+        <TextBlock Text="Chat model (this persona only)"
+                   Foreground="{DynamicResource MutedBrush}" Margin="0,12,0,0" TextWrapping="Wrap"/>
+        <ComboBox x:Name="InferenceModelCombo" Classes="input" Height="36"
+                  HorizontalAlignment="Stretch"
+                  SelectionChanged="InferenceModelCombo_SelectionChanged"/>
+        <TextBlock x:Name="InferenceModelHintText" FontSize="11" TextWrapping="Wrap"
+                   Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0"
+                   Text="Blank = Host default. Applies to this pack only."/>
       </StackPanel>
 
       <!-- Step 2: trait scales -->

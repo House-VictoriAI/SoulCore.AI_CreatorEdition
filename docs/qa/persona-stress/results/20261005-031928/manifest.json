@@ -1,0 +1,28 @@
+﻿{
+    "stamp":  "20261005-031928",
+    "personaId":  "lexi",
+    "pack":  "A",
+    "samples":  1,
+    "hostUrl":  "http://127.0.0.1:7700",
+    "harness":  "tmpcode/Invoke-PersonaStressSuite-PS51.ps1 (PS5.1 manual equivalent; product runner needs pwsh7)",
+    "seeds":  [
+                  {
+                      "id":  "A1",
+                      "sample":  1,
+                      "ok":  false,
+                      "error":  "Host error frame: Response status code does not indicate success: 404 (Not Found)."
+                  },
+                  {
+                      "id":  "A2",
+                      "sample":  1,
+                      "ok":  false,
+                      "error":  "Host error frame: Response status code does not indicate success: 404 (Not Found)."
+                  },
+                  {
+                      "id":  "A3",
+                      "sample":  1,
+                      "ok":  false,
+                      "error":  "Host error frame: Response status code does not indicate success: 404 (Not Found)."
+                  }
+              ]
+}

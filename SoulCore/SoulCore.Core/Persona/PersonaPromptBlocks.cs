@@ -11,6 +11,25 @@ public static class PersonaPromptBlocks
     public const string ToolMarker = "[Persona tools]";
 
     /// <summary>
+    /// Marker substring for hard pack policy sections in <see cref="PersonaPack.IdentityBlurb"/>
+    /// (LIMITS / META / UNCERTAINTY). Case-insensitive whole-word style match via
+    /// <see cref="BlurbHasHardLimits"/>.
+    /// </summary>
+    public const string LimitsMarker = "LIMITS";
+
+    /// <summary>
+    /// True when the identity blurb carries an explicit LIMITS section that must
+    /// outrank soft trait-compiler boundary language (PROP-15.17).
+    /// </summary>
+    public static bool BlurbHasHardLimits(string? identityBlurb)
+    {
+        if (string.IsNullOrWhiteSpace(identityBlurb))
+            return false;
+        // Match "## LIMITS", "LIMITS", "LIMITS:" without requiring charter lengthening.
+        return identityBlurb.Contains(LimitsMarker, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Standing address rule for the human, using the pack's <see cref="PersonaPack.HumanAddress"/>.
     /// </summary>
     public static string BuildHumanAddressRule(string humanAddress)
@@ -21,13 +40,23 @@ public static class PersonaPromptBlocks
             "if memory or history uses any other personal name for them, ignore it.";
     }
 
-    public static string BuildIdentityHeader(PersonaPack pack)
+    /// <summary>
+    /// Display line only (no blurb). Callers append IdentityBlurb after trait
+    /// Compile so hard LIMITS sit after soft voice bands (PROP-15.17).
+    /// </summary>
+    public static string BuildIdentityNameLine(PersonaPack pack)
     {
         ArgumentNullException.ThrowIfNull(pack);
         var display = string.IsNullOrWhiteSpace(pack.DisplayName) ? pack.PersonaId : pack.DisplayName.Trim();
         var id = string.IsNullOrWhiteSpace(pack.PersonaId) ? PersonaPack.BlankPersonaId : pack.PersonaId.Trim();
+        return $"You are {display} (personaId={id}).";
+    }
+
+    public static string BuildIdentityHeader(PersonaPack pack)
+    {
+        ArgumentNullException.ThrowIfNull(pack);
         var sb = new StringBuilder(256);
-        sb.Append("You are ").Append(display).Append(" (personaId=").Append(id).Append(").");
+        sb.Append(BuildIdentityNameLine(pack));
         if (!string.IsNullOrWhiteSpace(pack.IdentityBlurb))
             sb.Append('\n').Append(pack.IdentityBlurb.Trim());
         return sb.ToString();

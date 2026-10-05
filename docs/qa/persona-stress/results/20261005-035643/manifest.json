@@ -1,0 +1,64 @@
+﻿{
+    "stamp":  "20261005-035643",
+    "personaId":  "lexi",
+    "pack":  "C",
+    "samples":  3,
+    "hostUrl":  "http://127.0.0.1:7700",
+    "harness":  "tmpcode/Invoke-PersonaStressSuite-PS51.ps1 (PS5.1 manual equivalent; product runner needs pwsh7)",
+    "seeds":  [
+                  {
+                      "id":  "C1",
+                      "sample":  1,
+                      "sessionId":  "stress-C1-s1-20261005-035643",
+                      "ok":  true
+                  },
+                  {
+                      "id":  "C1",
+                      "sample":  2,
+                      "sessionId":  "stress-C1-s2-20261005-035643",
+                      "ok":  true
+                  },
+                  {
+                      "id":  "C1",
+                      "sample":  3,
+                      "sessionId":  "stress-C1-s3-20261005-035643",
+                      "ok":  true
+                  },
+                  {
+                      "id":  "C2",
+                      "sample":  1,
+                      "sessionId":  "stress-C2-s1-20261005-035643",
+                      "ok":  true
+                  },
+                  {
+                      "id":  "C2",
+                      "sample":  2,
+                      "sessionId":  "stress-C2-s2-20261005-035643",
+                      "ok":  true
+                  },
+                  {
+                      "id":  "C2",
+                      "sample":  3,
+                      "sessionId":  "stress-C2-s3-20261005-035643",
+                      "ok":  true
+                  },
+                  {
+                      "id":  "C3",
+                      "sample":  1,
+                      "sessionId":  "stress-C3-s1-20261005-035643",
+                      "ok":  true
+                  },
+                  {
+                      "id":  "C3",
+                      "sample":  2,
+                      "sessionId":  "stress-C3-s2-20261005-035643",
+                      "ok":  true
+                  },
+                  {
+                      "id":  "C3",
+                      "sample":  3,
+                      "sessionId":  "stress-C3-s3-20261005-035643",
+                      "ok":  true
+                  }
+              ]
+}

@@ -1,0 +1,16 @@
+﻿{
+    "stamp":  "20261005-043317",
+    "personaId":  "lexi",
+    "pack":  "S",
+    "samples":  1,
+    "hostUrl":  "http://127.0.0.1:7700",
+    "harness":  "tmpcode/Invoke-PersonaStressSuite-PS51.ps1 (PS5.1 manual equivalent; product runner needs pwsh7)",
+    "seeds":  [
+                  {
+                      "id":  "S3",
+                      "sample":  1,
+                      "sessionId":  "stress-S3-s1-20261005-043317",
+                      "ok":  true
+                  }
+              ]
+}

@@ -34,6 +34,61 @@ public sealed class SoulCorePersonaClient : IDisposable
     public static Uri ActivateUri(string personaId) =>
         new($"http://{ConnectionDefaults.Host}:{ConnectionDefaults.Port}/api/personas/{Uri.EscapeDataString(personaId)}/activate");
 
+    public static Uri InferenceModelsUri =>
+        new($"http://{ConnectionDefaults.Host}:{ConnectionDefaults.Port}/api/inference/models");
+
+    public async Task<InferenceModelsSnapshot> ListInferenceModelsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (!ConnectionDefaults.IsLocalLoopback(ConnectionDefaults.Host))
+        {
+            return new InferenceModelsSnapshot
+            {
+                Reachable = false,
+                Detail = $"Non-loopback host blocked: {ConnectionDefaults.Host}"
+            };
+        }
+
+        try
+        {
+            using var response = await _http.GetAsync(InferenceModelsUri, cancellationToken)
+                .ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                return new InferenceModelsSnapshot
+                {
+                    Reachable = true,
+                    Available = false,
+                    Detail = $"HTTP {(int)response.StatusCode}"
+                };
+            }
+
+            var dto = await response.Content.ReadFromJsonAsync<InferenceModelsDto>(JsonOptions, cancellationToken)
+                .ConfigureAwait(false);
+            var models = (dto?.Models ?? Array.Empty<string>())
+                .Select(PersonaWizardLogic.NormalizeInferenceModel)
+                .Where(m => m is not null)
+                .Select(m => m!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(m => m, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            return new InferenceModelsSnapshot
+            {
+                Reachable = true,
+                Available = dto?.Available ?? models.Length > 0,
+                Models = models,
+                HostModel = PersonaWizardLogic.NormalizeInferenceModel(dto?.HostModel),
+                ResolvedInferenceModel = PersonaWizardLogic.NormalizeInferenceModel(dto?.ResolvedInferenceModel),
+                Detail = dto?.Detail
+            };
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
+        {
+            return new InferenceModelsSnapshot { Reachable = false, Detail = ex.Message };
+        }
+    }
+
     public async Task<PersonaListSnapshot> ListAsync(CancellationToken cancellationToken = default)
     {
         if (!ConnectionDefaults.IsLocalLoopback(ConnectionDefaults.Host))
@@ -250,6 +305,8 @@ public sealed class SoulCorePersonaClient : IDisposable
                 charterSeedPath = pack.CharterSeedPath,
                 playwrightProfileDir = pack.PlaywrightProfileDir,
                 vmWindowTitle = pack.VmWindowTitle,
+                // PROP-15.12/15.16: blank/null = Host Inference:Model for this pack only.
+                inferenceModel = PersonaWizardLogic.NormalizeInferenceModel(pack.InferenceModel),
                 identityBlurb = pack.IdentityBlurb,
                 toolPolicy = pack.ToolPolicy is null
                     ? null
@@ -323,6 +380,8 @@ public sealed class SoulCorePersonaClient : IDisposable
         CharterSeedPath = dto.CharterSeedPath,
         PlaywrightProfileDir = dto.PlaywrightProfileDir,
         VmWindowTitle = dto.VmWindowTitle,
+        InferenceModel = PersonaWizardLogic.NormalizeInferenceModel(dto.InferenceModel),
+        ResolvedInferenceModel = PersonaWizardLogic.NormalizeInferenceModel(dto.ResolvedInferenceModel),
         CompiledDirectives = dto.CompiledDirectives,
         IsActive = dto.IsActive,
         Traits = dto.Traits is null
@@ -393,6 +452,12 @@ public sealed class SoulCorePersonaClient : IDisposable
         [JsonPropertyName("vmWindowTitle")]
         public string? VmWindowTitle { get; set; }
 
+        [JsonPropertyName("inferenceModel")]
+        public string? InferenceModel { get; set; }
+
+        [JsonPropertyName("resolvedInferenceModel")]
+        public string? ResolvedInferenceModel { get; set; }
+
         [JsonPropertyName("compiledDirectives")]
         public string? CompiledDirectives { get; set; }
 
@@ -404,6 +469,24 @@ public sealed class SoulCorePersonaClient : IDisposable
 
         [JsonPropertyName("toolPolicy")]
         public ToolPolicyDto? ToolPolicy { get; set; }
+    }
+
+    private sealed class InferenceModelsDto
+    {
+        [JsonPropertyName("models")]
+        public string[]? Models { get; set; }
+
+        [JsonPropertyName("available")]
+        public bool Available { get; set; }
+
+        [JsonPropertyName("detail")]
+        public string? Detail { get; set; }
+
+        [JsonPropertyName("hostModel")]
+        public string? HostModel { get; set; }
+
+        [JsonPropertyName("resolvedInferenceModel")]
+        public string? ResolvedInferenceModel { get; set; }
     }
 
     private sealed class TraitsDto
@@ -474,6 +557,16 @@ public sealed class PersonaActivateSnapshot
     public string? Detail { get; init; }
 }
 
+public sealed class InferenceModelsSnapshot
+{
+    public bool Reachable { get; init; }
+    public bool Available { get; init; }
+    public IReadOnlyList<string> Models { get; init; } = Array.Empty<string>();
+    public string? HostModel { get; init; }
+    public string? ResolvedInferenceModel { get; init; }
+    public string? Detail { get; init; }
+}
+
 public sealed class PersonaPackInfo
 {
     public string PersonaId { get; init; } = "";
@@ -484,6 +577,10 @@ public sealed class PersonaPackInfo
     public string? CharterSeedPath { get; init; }
     public string? PlaywrightProfileDir { get; init; }
     public string? VmWindowTitle { get; init; }
+    /// <summary>PROP-15.11/15.12 — pack override; blank/null = Host default.</summary>
+    public string? InferenceModel { get; init; }
+    /// <summary>Host-resolved model for this pack (override or Host Inference:Model).</summary>
+    public string? ResolvedInferenceModel { get; init; }
     public string? CompiledDirectives { get; init; }
     public bool IsActive { get; init; }
     public PersonaTraitScalesInfo Traits { get; init; } = new();
@@ -502,6 +599,8 @@ public sealed class PersonaPackWrite
     public string? CharterSeedPath { get; set; }
     public string? PlaywrightProfileDir { get; set; }
     public string? VmWindowTitle { get; set; }
+    /// <summary>PROP-15.12 — blank/null = inherit Host Inference:Model.</summary>
+    public string? InferenceModel { get; set; }
     public PersonaTraitScalesInfo Traits { get; set; } = new();
     public PersonaToolPolicyInfo? ToolPolicy { get; set; }
 }

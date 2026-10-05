@@ -2,7 +2,10 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Options;
+using SoulCore.Config;
 using SoulCore.Core.Persona;
+using SoulCore.Inference.Tooling;
 
 namespace SoulCore.Host.Persona;
 
@@ -16,35 +19,53 @@ public static class PersonaApiEndpoints
     {
         var group = app.MapGroup("/api/personas");
 
-        group.MapGet("/", async (IPersonaPackStore store, IPersonaSession session, CancellationToken ct) =>
+        group.MapGet("/", async (
+            IPersonaPackStore store,
+            IPersonaSession session,
+            IOptions<InferenceOptions> inferenceOpts,
+            CancellationToken ct) =>
         {
             var packs = await store.ListAsync(ct).ConfigureAwait(false);
             var activeId = session.ActivePersonaId;
+            var inf = inferenceOpts.Value;
             return Results.Json(new
             {
                 activePersonaId = activeId,
-                personas = packs.Select(p => ToDto(p, isActive: string.Equals(p.PersonaId, activeId, StringComparison.OrdinalIgnoreCase)))
+                personas = packs.Select(p => ToDto(
+                    p,
+                    isActive: string.Equals(p.PersonaId, activeId, StringComparison.OrdinalIgnoreCase),
+                    inferenceOptions: inf))
             });
         });
 
         group.MapGet("/active", (
             IPersonaSession session,
-            IPersonaToolPathsResolver toolPaths) =>
+            IPersonaToolPathsResolver toolPaths,
+            IOptions<InferenceOptions> inferenceOpts) =>
         {
             var pack = session.GetActive();
-            return Results.Json(ToDto(pack, isActive: true, toolPaths));
+            return Results.Json(ToDto(pack, isActive: true, toolPaths, inferenceOpts.Value));
         });
 
-        group.MapGet("/{personaId}", async (string personaId, IPersonaPackStore store, IPersonaSession session, CancellationToken ct) =>
+        group.MapGet("/{personaId}", async (
+            string personaId,
+            IPersonaPackStore store,
+            IPersonaSession session,
+            IOptions<InferenceOptions> inferenceOpts,
+            CancellationToken ct) =>
         {
             var pack = await store.GetAsync(personaId, ct).ConfigureAwait(false);
             if (pack is null)
                 return Results.NotFound(new { error = $"Unknown personaId '{personaId}'." });
             var active = string.Equals(pack.PersonaId, session.ActivePersonaId, StringComparison.OrdinalIgnoreCase);
-            return Results.Json(ToDto(pack, active));
+            return Results.Json(ToDto(pack, active, inferenceOptions: inferenceOpts.Value));
         });
 
-        group.MapPost("/", async (HttpRequest request, IPersonaPackStore store, CancellationToken ct) =>
+        group.MapPost("/", async (
+            HttpRequest request,
+            IPersonaPackStore store,
+            IOptions<InferenceOptions> inferenceOpts,
+            CancellationToken ct) =>
         {
             PersonaPack? body;
             try
@@ -65,7 +86,7 @@ public static class PersonaApiEndpoints
             try
             {
                 var saved = await store.UpsertAsync(body, ct).ConfigureAwait(false);
-                return Results.Json(ToDto(saved, isActive: false));
+                return Results.Json(ToDto(saved, isActive: false, inferenceOptions: inferenceOpts.Value));
             }
             catch (ArgumentException ex)
             {
@@ -78,6 +99,7 @@ public static class PersonaApiEndpoints
             HttpRequest request,
             IPersonaPackStore store,
             IPersonaSession session,
+            IOptions<InferenceOptions> inferenceOpts,
             CancellationToken ct) =>
         {
             PersonaPack? body;
@@ -109,7 +131,7 @@ public static class PersonaApiEndpoints
                     await session.ReloadActiveAsync(ct).ConfigureAwait(false);
 
                 var active = string.Equals(saved.PersonaId, session.ActivePersonaId, StringComparison.OrdinalIgnoreCase);
-                return Results.Json(ToDto(saved, active));
+                return Results.Json(ToDto(saved, active, inferenceOptions: inferenceOpts.Value));
             }
             catch (ArgumentException ex)
             {
@@ -121,19 +143,23 @@ public static class PersonaApiEndpoints
             string personaId,
             IPersonaSession session,
             IPersonaToolPathsResolver toolPaths,
+            IOptions<InferenceOptions> inferenceOpts,
             CancellationToken ct) =>
         {
             try
             {
                 await session.SetActiveAsync(personaId, ct).ConfigureAwait(false);
                 var pack = session.GetActive();
+                var inf = inferenceOpts.Value ?? new InferenceOptions();
+                var resolvedModel = InferenceModelRouting.ResolveChatModel(inf, pack.InferenceModel);
                 return Results.Json(new
                 {
                     activePersonaId = pack.PersonaId,
-                    note = "Active pack switched; identity/directives apply on the next chat turn. PROP-15.5 tool paths follow this pack.",
-                    persona = ToDto(pack, isActive: true, toolPaths),
+                    note = "Active pack switched; identity/directives/model apply on the next chat turn. PROP-15.5 tool paths + PROP-15.11 InferenceModel follow this pack.",
+                    persona = ToDto(pack, isActive: true, toolPaths, inf),
                     resolvedDesktopTargetWindowTitle = toolPaths.ResolveDesktopTargetWindowTitle(),
-                    resolvedPlaywrightUserDataDir = toolPaths.ResolvePlaywrightUserDataDir()
+                    resolvedPlaywrightUserDataDir = toolPaths.ResolvePlaywrightUserDataDir(),
+                    resolvedInferenceModel = resolvedModel
                 });
             }
             catch (KeyNotFoundException ex)
@@ -171,7 +197,8 @@ public static class PersonaApiEndpoints
     private static object ToDto(
         PersonaPack pack,
         bool isActive,
-        IPersonaToolPathsResolver? toolPaths = null)
+        IPersonaToolPathsResolver? toolPaths = null,
+        InferenceOptions? inferenceOptions = null)
     {
         string? resolvedTitle = null;
         string? resolvedProfile = null;
@@ -180,6 +207,10 @@ public static class PersonaApiEndpoints
             resolvedTitle = toolPaths.ResolveDesktopTargetWindowTitle();
             resolvedProfile = toolPaths.ResolvePlaywrightUserDataDir();
         }
+
+        string? resolvedInferenceModel = null;
+        if (inferenceOptions is not null)
+            resolvedInferenceModel = InferenceModelRouting.ResolveChatModel(inferenceOptions, pack.InferenceModel);
 
         return new
         {
@@ -190,6 +221,8 @@ public static class PersonaApiEndpoints
             charterSeedPath = pack.CharterSeedPath,
             playwrightProfileDir = pack.PlaywrightProfileDir,
             vmWindowTitle = pack.VmWindowTitle,
+            inferenceModel = pack.InferenceModel,
+            resolvedInferenceModel,
             resolvedDesktopTargetWindowTitle = resolvedTitle,
             resolvedPlaywrightUserDataDir = resolvedProfile,
             identityBlurb = pack.IdentityBlurb,

@@ -1,0 +1,28 @@
+﻿{
+    "stamp":  "20261005-042223",
+    "personaId":  "lexi",
+    "pack":  "S",
+    "samples":  1,
+    "hostUrl":  "http://127.0.0.1:7700",
+    "harness":  "tmpcode/Invoke-PersonaStressSuite-PS51.ps1 (PS5.1 manual equivalent; product runner needs pwsh7)",
+    "seeds":  [
+                  {
+                      "id":  "S1",
+                      "sample":  1,
+                      "ok":  false,
+                      "error":  "Exception calling \"GetResult\" with \"0\" argument(s): \"The WebSocket is in an invalid state (\u0027Aborted\u0027) for this operation. Valid states are: \u0027Open, CloseReceived\u0027\""
+                  },
+                  {
+                      "id":  "S2",
+                      "sample":  1,
+                      "ok":  false,
+                      "error":  "Exception calling \"GetResult\" with \"0\" argument(s): \"The WebSocket is in an invalid state (\u0027Aborted\u0027) for this operation. Valid states are: \u0027Open, CloseReceived\u0027\""
+                  },
+                  {
+                      "id":  "S3",
+                      "sample":  1,
+                      "ok":  false,
+                      "error":  "Exception calling \"GetResult\" with \"0\" argument(s): \"The WebSocket is in an invalid state (\u0027Aborted\u0027) for this operation. Valid states are: \u0027Open, CloseReceived\u0027\""
+                  }
+              ]
+}

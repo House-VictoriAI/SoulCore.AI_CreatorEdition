@@ -6,6 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SoulCore.Config;
+using SoulCore.Core.Persona;
+using SoulCore.Inference.Tooling;
 using SoulCore.Inference.Tools.Desktop;
 using SoulCore.Inference.Tools.Workflow;
 
@@ -56,6 +58,7 @@ public sealed class OllamaInferenceClient : IInferenceClient
     private readonly ILogger<OllamaInferenceClient> _logger;
     private readonly IToolRegistry? _toolRegistry;
     private readonly IUeLiveSignal _ueLive;
+    private readonly IPersonaSession? _personaSession;
 
     /// <summary>
     /// DI-friendly constructor (the one <c>AddHttpClient&lt;OllamaInferenceClient&gt;</c>
@@ -71,8 +74,9 @@ public sealed class OllamaInferenceClient : IInferenceClient
         HttpClient http,
         IOptions<InferenceOptions> options,
         ILogger<OllamaInferenceClient> logger,
-        IUeLiveSignal ueLive)
-        : this(http, options, logger, toolRegistry: null, ueLive)
+        IUeLiveSignal ueLive,
+        IPersonaSession personaSession)
+        : this(http, options, logger, toolRegistry: null, ueLive, personaSession)
     {
     }
 
@@ -83,18 +87,23 @@ public sealed class OllamaInferenceClient : IInferenceClient
     /// registry per turn); the ctor-injected one is a fallback when the call
     /// does not supply one.
     /// </param>
+    /// <param name="personaSession">
+    /// PROP-15.11: optional active persona — pack <c>InferenceModel</c> wins over Host.
+    /// </param>
     public OllamaInferenceClient(
         HttpClient http,
         IOptions<InferenceOptions> options,
         ILogger<OllamaInferenceClient> logger,
         IToolRegistry? toolRegistry,
-        IUeLiveSignal? ueLive = null)
+        IUeLiveSignal? ueLive = null,
+        IPersonaSession? personaSession = null)
     {
         _http = http ?? throw new ArgumentNullException(nameof(http));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _toolRegistry = toolRegistry;
         _ueLive = ueLive ?? new NullUeLiveSignal();
+        _personaSession = personaSession;
     }
 
     public async Task<string> CompleteAsync(
@@ -112,7 +121,7 @@ public sealed class OllamaInferenceClient : IInferenceClient
         if (_options.NumCtx > 0)
             options.NumCtx = _options.NumCtx;
 
-        var chatModel = InferenceModelRouting.ResolveChatModel(_options);
+        var chatModel = InferenceModelRouting.ResolveChatModel(_options, _personaSession);
         var payload = new OllamaGenerateRequest
         {
             Model = chatModel,
@@ -142,6 +151,46 @@ public sealed class OllamaInferenceClient : IInferenceClient
 
         var parsed = JsonSerializer.Deserialize<OllamaGenerateResponse>(body, JsonOptions);
         return parsed?.Response ?? string.Empty;
+    }
+
+    /// <summary>
+    /// PROP-15.11: list local/cloud models via Ollama <c>GET /api/tags</c> for FED picker.
+    /// Fail-soft: returns empty list + detail when unreachable — never throws to Host.
+    /// </summary>
+    public async Task<OllamaModelListResult> ListLocalModelsAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var response = await _http.GetAsync("api/tags", cancellationToken).ConfigureAwait(false);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "Ollama /api/tags failed: {Status} {Body}",
+                    (int)response.StatusCode,
+                    TextUtil.Truncate(body, 200));
+                return OllamaModelListResult.Unavailable(
+                    $"Ollama returned {(int)response.StatusCode}.");
+            }
+
+            var parsed = JsonSerializer.Deserialize<OllamaTagsResponse>(body, JsonOptions);
+            var names = (parsed?.Models ?? new List<OllamaTagModel>())
+                .Select(m => (m.Name ?? string.Empty).Trim())
+                .Where(n => n.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            return OllamaModelListResult.Ok(names);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Ollama /api/tags unreachable");
+            return OllamaModelListResult.Unavailable(ex.Message);
+        }
     }
 
     /// <summary>
@@ -205,7 +254,7 @@ public sealed class OllamaInferenceClient : IInferenceClient
         var forceNudgeUsed = false;
 
         var ueLive = _ueLive.IsUeLive;
-        var toolModel = InferenceModelRouting.ResolveToolModel(_options, ueLive);
+        var toolModel = InferenceModelRouting.ResolveToolModel(_options, ueLive, _personaSession);
         var toolNumCtx = InferenceModelRouting.ResolveToolNumCtx(_options, ueLive);
 
         _logger.LogInformation(
@@ -1539,4 +1588,35 @@ public sealed class OllamaInferenceClient : IInferenceClient
         public string? Content { get; set; }
         public List<OllamaToolCallDto>? ToolCalls { get; set; }
     }
+
+    private sealed class OllamaTagsResponse
+    {
+        public List<OllamaTagModel>? Models { get; set; }
+    }
+
+    private sealed class OllamaTagModel
+    {
+        public string? Name { get; set; }
+    }
+}
+
+/// <summary>PROP-15.11: fail-soft result of <c>GET /api/tags</c>.</summary>
+public sealed class OllamaModelListResult
+{
+    public IReadOnlyList<string> Models { get; init; } = Array.Empty<string>();
+    public bool Available { get; init; }
+    public string? Detail { get; init; }
+
+    public static OllamaModelListResult Ok(IReadOnlyList<string> models) => new()
+    {
+        Models = models,
+        Available = true
+    };
+
+    public static OllamaModelListResult Unavailable(string? detail) => new()
+    {
+        Models = Array.Empty<string>(),
+        Available = false,
+        Detail = detail
+    };
 }

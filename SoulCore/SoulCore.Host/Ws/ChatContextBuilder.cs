@@ -78,12 +78,17 @@ public sealed class ChatContextBuilder : IChatContextBuilder
         var identityAnchors = await identityTask.ConfigureAwait(false);
         var emotionPreamble = await emotionTask.ConfigureAwait(false);
 
+        var blurbHasLimits = PersonaPromptBlocks.BlurbHasHardLimits(pack.IdentityBlurb);
+        var boundaryBand = PersonaTraitCompiler.ToBand(
+            (pack.Traits ?? new PersonaTraitScales()).BoundaryStrictness);
         _logger.LogDebug(
-            "Chat context loaded: persona={PersonaId} memories={MemoryCount} identity={IdentityCount} emotionChars={EmotionLen}",
+            "Chat context loaded: persona={PersonaId} memories={MemoryCount} identity={IdentityCount} emotionChars={EmotionLen} blurbHasLimits={BlurbHasLimits} boundaryBand={BoundaryBand}",
             pack.PersonaId,
             recentMemories.Count,
             identityAnchors.Count,
-            emotionPreamble.Length);
+            emotionPreamble.Length,
+            blurbHasLimits,
+            boundaryBand);
 
         var preamble = BuildContextPreamble(identityAnchors, recentMemories, emotionPreamble, pack);
 
@@ -220,18 +225,27 @@ public sealed class ChatContextBuilder : IChatContextBuilder
             .ConfigureAwait(false);
     }
 
-    /// <summary>Builds the [Identity] section from pack directives + charter anchors.</summary>
+    /// <summary>
+    /// Builds the [Identity] section from pack directives + charter anchors.
+    /// Order (PROP-15.17): name → human address → trait Compile (voice/recall;
+    /// soft Low boundaries gated when blurb has LIMITS) → IdentityBlurb
+    /// (LIMITS/META/UNCERTAINTY last so hard policy wins attention) → charter anchors.
+    /// </summary>
     public static string BuildIdentityBlock(IReadOnlyList<string> identityAnchors, PersonaPack pack)
     {
         ArgumentNullException.ThrowIfNull(pack);
 
+        var hardLimits = PersonaPromptBlocks.BlurbHasHardLimits(pack.IdentityBlurb);
         var sb = new StringBuilder(768);
         sb.Append("[Identity]\n");
-        sb.Append(PersonaPromptBlocks.BuildIdentityHeader(pack));
+        sb.Append(PersonaPromptBlocks.BuildIdentityNameLine(pack));
         sb.Append('\n');
         sb.Append(PersonaPromptBlocks.BuildHumanAddressRule(pack.HumanAddress));
         sb.Append('\n');
-        sb.Append(PersonaTraitCompiler.Compile(pack));
+        // Trait voice/recall before blurb; soft "Flexible boundaries" omitted when LIMITS present.
+        sb.Append(PersonaTraitCompiler.Compile(pack, hardLimitsFromBlurb: hardLimits));
+        if (!string.IsNullOrWhiteSpace(pack.IdentityBlurb))
+            sb.Append('\n').Append(pack.IdentityBlurb.Trim());
         if (identityAnchors is { Count: > 0 })
         {
             foreach (var anchor in identityAnchors)

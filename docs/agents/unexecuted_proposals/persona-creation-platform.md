@@ -1,6 +1,7 @@
 ---
 type: proposal
 status: accepted-pm-ticketed
+pm_note: v1 spine complete 2026-10-05 (15.1–15.10); feel-drive next — promote accepted-shipped when on main + feel OK
 tt_id: TT-01
 prop_id: PROP-15-persona-creation-platform
 created: 2026-10-05
@@ -156,3 +157,17 @@ Answers are sufficient for send-to-PM.
 - **Route:** Avenue **B+** accepted as written.
 - **Owner split adjustment:** 15.3 → **FED-01** primary (wizard UI); trait-band compiler + pack persist live in **15.1**; 15.5 → **BED-01** primary with Windows desk smoke evidence (OPS-HOME if needed).
 - **First handoff:** PROP-15.1 → BED-01.
+
+## 12. Desk/Core boundary (2026-10-05)
+
+**Locked: Host-only template gallery** until after v1 feel-drive. ChatDesktop does **not** reference `SoulCore.Core`. Offline BuiltIn pack mirrors removed (PROP-15.10). Thin HTTP DTOs kept. Revisit share-Core only if offline create becomes a real need.
+
+## 13. Feel-drive — per-persona model (2026-10-05)
+
+Operator must select/change the LLM **per persona**, only in that persona’s settings (not a global Host/Presence control). Empty pack field inherits Host `Inference:Model`. Tickets: **15.11** BED, **15.12** FED.
+
+## 14. Feel-drive — stress suite (2026-10-05)
+
+Persona behavioral stress suite (confabulation / lines / identity / routing / soaks): `docs/qa/persona-stress/`. Runner: `SoulCore/scripts/persona-stress/Invoke-PersonaStressSuite.ps1`. Execute: **PROP-15.13** QA.
+
+**15.13 Fail (lexi / mother):** under-weighted — trait `CompileBoundaries` after IdentityBlurb undercuts LIMITS. Fix **15.17** BED; session pin **15.18** OPS. Do not lengthen charter.

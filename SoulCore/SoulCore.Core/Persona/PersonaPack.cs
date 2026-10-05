@@ -40,6 +40,13 @@ public sealed class PersonaPack
     /// </summary>
     public string? VmWindowTitle { get; set; }
 
+    /// <summary>
+    /// PROP-15.11 — Ollama chat model for this persona.
+    /// Blank/null → Host <c>Inference:Model</c>. Tool-loop uses the same when
+    /// Host <c>Inference:ToolModel</c> is unset.
+    /// </summary>
+    public string? InferenceModel { get; set; }
+
     /// <summary>Short free-text identity seed folded into [Identity].</summary>
     public string? IdentityBlurb { get; set; }
 
@@ -58,6 +65,7 @@ public sealed class PersonaPack
         CharterSeedPath = CharterSeedPath,
         PlaywrightProfileDir = PlaywrightProfileDir,
         VmWindowTitle = VmWindowTitle,
+        InferenceModel = InferenceModel,
         IdentityBlurb = IdentityBlurb,
         ToolPolicy = ToolPolicy.Clone(),
         Traits = Traits.Clone(),

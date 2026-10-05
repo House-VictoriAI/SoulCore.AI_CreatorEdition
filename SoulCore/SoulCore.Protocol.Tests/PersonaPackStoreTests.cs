@@ -194,6 +194,40 @@ public class PersonaPackStoreTests
     }
 
     [Fact]
+    public async Task Upsert_TwoPersonas_PersistDistinctInferenceModels()
+    {
+        var root = CreateTempRoot();
+        try
+        {
+            var store = new PersonaPackStore(root, NullLogger<PersonaPackStore>.Instance);
+            await store.EnsureSeededAsync();
+
+            var a = PersonaPack.CreateBlank();
+            a.PersonaId = "model-a";
+            a.DisplayName = "Model A";
+            a.InferenceModel = "qwen2.5:0.5b";
+            await store.UpsertAsync(a);
+
+            var b = PersonaPack.CreateBlank();
+            b.PersonaId = "model-b";
+            b.DisplayName = "Model B";
+            b.InferenceModel = "gemma4:latest";
+            await store.UpsertAsync(b);
+
+            var loadedA = await store.GetAsync("model-a");
+            var loadedB = await store.GetAsync("model-b");
+            Assert.NotNull(loadedA);
+            Assert.NotNull(loadedB);
+            Assert.Equal("qwen2.5:0.5b", loadedA!.InferenceModel);
+            Assert.Equal("gemma4:latest", loadedB!.InferenceModel);
+        }
+        finally
+        {
+            TryDelete(root);
+        }
+    }
+
+    [Fact]
     public async Task UpsertAndGet_UsesSharedPersonaMemoryPathsNormalizer()
     {
         var root = CreateTempRoot();

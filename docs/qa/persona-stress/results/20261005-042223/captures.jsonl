@@ -1,0 +1,3 @@
+﻿{"seedId":"S1","sample":1,"error":"Exception calling \"GetResult\" with \"0\" argument(s): \"The WebSocket is in an invalid state (\u0027Aborted\u0027) for this operation. Valid states are: \u0027Open, CloseReceived\u0027\""}
+{"seedId":"S2","sample":1,"error":"Exception calling \"GetResult\" with \"0\" argument(s): \"The WebSocket is in an invalid state (\u0027Aborted\u0027) for this operation. Valid states are: \u0027Open, CloseReceived\u0027\""}
+{"seedId":"S3","sample":1,"error":"Exception calling \"GetResult\" with \"0\" argument(s): \"The WebSocket is in an invalid state (\u0027Aborted\u0027) for this operation. Valid states are: \u0027Open, CloseReceived\u0027\""}

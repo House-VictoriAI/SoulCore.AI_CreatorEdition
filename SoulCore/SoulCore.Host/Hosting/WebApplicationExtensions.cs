@@ -16,6 +16,7 @@ using SoulCore.Core.Charter;
 using SoulCore.Core.Safety;
 using SoulCore.Core.Persona;
 using SoulCore.Host.Companion;
+using SoulCore.Host.Inference;
 using SoulCore.Host.Persona;
 using SoulCore.Host.Voice;
 using SoulCore.Host.Ws;
@@ -73,6 +74,7 @@ internal static class WebApplicationExtensions
         app.MapCompanionApi();
         app.MapVoiceApi();
         app.MapPersonaApi();
+        app.MapInferenceApi();
 
         app.MapGet("/health", async (
             IOptions<HostBindOptions> opts,
@@ -133,6 +135,10 @@ internal static class WebApplicationExtensions
 
             var charterFullyLocked = charterTotal > 0 && charterLocked == charterTotal;
             var activePack = personaSession.GetActive();
+            // PROP-15.11: /health.model is what chat/tool-loop will use (pack → Host).
+            var resolvedChatModel = InferenceModelRouting.ResolveChatModel(
+                inferenceOptions,
+                activePack.InferenceModel);
 
             return Results.Json(new
             {
@@ -147,7 +153,8 @@ internal static class WebApplicationExtensions
                     personaId = activePack.PersonaId,
                     displayName = activePack.DisplayName,
                     contactId = activePack.ContactId,
-                    humanAddress = activePack.HumanAddress
+                    humanAddress = activePack.HumanAddress,
+                    inferenceModel = activePack.InferenceModel
                 },
                 ws = new
                 {
@@ -167,8 +174,13 @@ internal static class WebApplicationExtensions
                     provider = inferenceOptions.Enabled
                         ? (inferenceOptions.IsCloudEndpoint ? "ollama-cloud" : "ollama")
                         : "null",
-                    // BED-01 / TASK-157: expose configured chat model for QA/ops (no secrets).
-                    model = inferenceOptions.Model,
+                    // PROP-15.15: canonical pair is hostModel + resolvedInferenceModel.
+                    // `model` remains a documented alias of resolvedInferenceModel (PROP-15.11 clients).
+                    model = resolvedChatModel,
+                    resolvedInferenceModel = resolvedChatModel,
+                    hostModel = inferenceOptions.Model,
+                    personaInferenceModel = activePack.InferenceModel,
+                    modelSource = string.IsNullOrWhiteSpace(activePack.InferenceModel) ? "host" : "persona",
                     cloud = inferenceOptions.IsCloudEndpoint,
                     baseUrl = inferenceOptions.IsCloudEndpoint ? InferenceOptions.CloudBaseUrl : "loopback",
                     embeddingsEnabled = embeddingsOn,
@@ -370,12 +382,15 @@ internal static class WebApplicationExtensions
         // (read-only from active persona's quarantined CharterService; no fabricated biography).
         app.MapGet("/settings/identity", async (
             IOptions<CompanionOptions> companionOpts,
+            IOptions<InferenceOptions> inferenceOpts,
             IPersonaSession personaSession,
             IPersonaStoreHub personaStores,
             CancellationToken cancellationToken) =>
         {
             var companion = companionOpts.Value ?? new CompanionOptions();
             var pack = personaSession.GetActive();
+            var inference = inferenceOpts.Value ?? new InferenceOptions();
+            var resolvedModel = InferenceModelRouting.ResolveChatModel(inference, pack.InferenceModel);
             int charterTotal = 0, charterLocked = 0;
             IReadOnlyList<CharterAnchorInfo> identityAnchors = Array.Empty<CharterAnchorInfo>();
             IReadOnlyList<CharterAnchorInfo> allAnchors = Array.Empty<CharterAnchorInfo>();
@@ -409,6 +424,9 @@ internal static class WebApplicationExtensions
                 displayName = pack.DisplayName,
                 contactId = pack.ContactId,
                 humanAddress = pack.HumanAddress,
+                inferenceModel = pack.InferenceModel,
+                resolvedInferenceModel = resolvedModel,
+                hostModel = inference.Model,
                 companionFallbackContactId = companion.DefaultContactId,
                 memoryDbPath = personaStores.ResolveMemoryDbPath(pack.PersonaId),
                 charter = new
@@ -420,7 +438,7 @@ internal static class WebApplicationExtensions
                 },
                 identityAnchors = identityAnchors.Select(AnchorDto).ToArray(),
                 anchors = allAnchors.Select(AnchorDto).ToArray(),
-                note = "Display name/contact from active PersonaPack. Charter/episodic/journal from persona-quarantined SQLite (PROP-15.2)."
+                note = "Display name/contact/InferenceModel from active PersonaPack. Charter/episodic/journal from persona-quarantined SQLite (PROP-15.2). PROP-15.15: hostModel + resolvedInferenceModel (pack → Host Inference:Model)."
             });
         });
 

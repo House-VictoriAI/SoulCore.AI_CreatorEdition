@@ -30,7 +30,13 @@ public static class PersonaTraitCompiler
         return PersonaTraitBand.High;
     }
 
-    public static string Compile(PersonaPack pack)
+    /// <summary>
+    /// Compiles trait bands into a directive block.
+    /// When <paramref name="hardLimitsFromBlurb"/> is true, Low soft
+    /// ("Flexible boundaries…") is omitted so IdentityBlurb LIMITS are not undercut
+    /// (PROP-15.17). Mid/High boundary lines still emit.
+    /// </summary>
+    public static string Compile(PersonaPack pack, bool hardLimitsFromBlurb = false)
     {
         ArgumentNullException.ThrowIfNull(pack);
         var traits = pack.Traits ?? new PersonaTraitScales();
@@ -45,7 +51,9 @@ public static class PersonaTraitCompiler
         var sb = new StringBuilder(512);
         sb.Append(Marker).Append('\n');
         sb.Append("Voice: ").Append(CompileVoice(warmth, directness, formality, playfulness)).Append('\n');
-        sb.Append("Boundaries: ").Append(CompileBoundaries(boundaries)).Append('\n');
+        // Soft Low band fights hard LIMITS text — skip when blurb already marks LIMITS.
+        if (!(hardLimitsFromBlurb && boundaries == PersonaTraitBand.Low))
+            sb.Append("Boundaries: ").Append(CompileBoundaries(boundaries)).Append('\n');
         sb.Append("Recall: ").Append(CompileRecall(recall));
         return sb.ToString();
     }
